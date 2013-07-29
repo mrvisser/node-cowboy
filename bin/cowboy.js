@@ -46,7 +46,7 @@ cowboy.context.init(argv, function(err) {
 
     var lasso = cowboy.context.getLassoPlugin(command);
     if (!lasso) {
-        _logError('Could not find lasso plugin for command "%s"', command);
+        cowboy.logger.system().error('Could not find lasso plugin for command "%s"', command);
     }
 
     var renderResponseFunction = lasso.renderResponse || require('cowboy/lib/renderers/default').renderResponse;
