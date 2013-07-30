@@ -71,6 +71,15 @@ var handle = module.exports.handle = function(args, done) {
 };
 
 /**
+ * Perform something after the reply has been sent back to the cowboy
+ *
+ * @param  {Object}     err     An error that occurred returning a response, if any
+ * @param  {Number}     code    The numeric code indicating the exit status of the handler
+ * @param  {Object}     reply   The reply object that was sent by the handler
+ */
+var afterResponse = module.exports.afterResponse = function(err, code, reply) { };
+
+/**
  * Render a single response from a cattle node.
  *
  * @param  {String}     name    The name of the cattle node who gave this response
