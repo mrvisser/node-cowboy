@@ -2,9 +2,32 @@
 
 **Cowboy** is a tool inspired by MCollective that fills essentially the same need, lassoing a large cluster of servers together in order to perform execution tasks in parallel. I got sad with how difficult MCollective was to set up (mostly to install and configure ActiveMQ, Ruby stomp gem, etc...) and decided something in nodejs would be much simpler.
 
+## Simple Usage
+
+First [download and install Redis](http://redis.io/download), make sure it's listening on port 6379. Then install and run cowboy:
+
+```bash
+
+# It will be on NPM when it hits a functional milestone
+npm -g install git://github.com/mrvisser/cowboy
+
+# Start the cattle server
+$ npm -g start cowboy
+
+# Send a ping command to all the remote cattle servers
+~/Source/cowboy$ cowboy ping
+[04:08:33.619Z]  INFO branden-macbook.local: pong
+[04:08:38.617Z]  INFO system: Complete
+
+# Install express on all the remote cattle servers
+~/Source/cowboy$ cowboy npm-install express
+[04:08:50.726Z]  INFO branden-macbook.local: Installed version 3.3.4 of module express
+[04:08:52.439Z]  INFO system: Complete
+```
+
 ## How it works
 
-Cowboy uses a server module called, well, the "cowboy" and each server in your cluster runs a "cattle" client. The cowboy broadcasts messages to the cattle using Redis PubSub and the cattle respond with another pubsub message back to the cowboy.
+Cowboy uses a client module called, well, the "cowboy" and each server in your cluster runs a "cattle" server. The cowboy broadcasts messages to the cattle using Redis PubSub and the cattle responds with another PubSub message back to the cowboy.
 
 ## Example
 
@@ -85,7 +108,7 @@ var renderComplete = module.exports.renderResponses = function(responses, args, 
 
 As you can see the current functionality is very basic. Also, there has been next to no testing aside from my local laptop. Next sets of features in scope (in order of priority) are:
 
-* In addition to `ping`, a core plugin that allows you to install new cowboy modules. It is unlikely there will be *core* modules than these 2 as they should provide everything to get started installing new plugins
+* ~~In addition to `ping`, a core plugin that allows you to install new cowboy modules.~~ It is unlikely there will be *core* modules than these 2 as they should provide everything to get started installing new plugins
 * Ability to filter which cattle servers should reply to a command
 * Ability to configure / derive more information about your cattle server ("facts") other than host, and possible integration with tools like facter
 

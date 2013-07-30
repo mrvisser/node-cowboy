@@ -18,6 +18,7 @@ var handle = module.exports.handle = function(args, done) {
  * @param  {Number}     code    The numeric code with which the lasso plugin exitted
  * @param  {Object}     reply   The arbitrary reply object that was sent back with the exit code
  * @param  {String[]}   args    The arguments that the command was invoked with
+ * @param  {Object}     logger  A Bunyan logger that can be used to render information to the log
  * @param  {Function}   done    Invoke this when you are done rendering
  */
 var renderResponse = module.exports.renderResponse = function(name, code, reply, args, logger, done) {
@@ -34,6 +35,7 @@ var renderResponse = module.exports.renderResponse = function(name, code, reply,
  * @param  {Number}     responses[i].code   The numeric code with which the lasso plugin exitted
  * @param  {Object}     responses[i].reply  The arbitrary reply object that was sent back with the exit code
  * @param  {String[]}   args                The arguments that the command was invoked with
+ * @param  {Object}     logger              A Bunyan logger that can be used to render information to the log
  * @param  {Function}   done                Invoke this when you are done rendering
  */
 var renderComplete = module.exports.renderResponses = function(responses, args, logger, done) {

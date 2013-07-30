@@ -7,6 +7,10 @@
         "cowboy": "./bin/cowboy.js",
         "cattle": "./bin/cattle.js"
     },
+    "scripts": {
+        "start": "forever start bin/cattle.js",
+        "stop": "forever stop bin/cattle.js"
+    },
     "homepage": "http://www.mrvisser.ca",
     "author": {
         "name": "Branden Visser",
@@ -26,6 +30,7 @@
         "minimatch": "latest",
         "optimist": "latest",
         "redis": "latest",
+        "shelljs": "latest",
         "stripcolorcodes": "latest",
         "underscore": "latest"
     },
