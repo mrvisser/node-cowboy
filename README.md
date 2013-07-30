@@ -8,6 +8,8 @@ First [download and install Redis](http://redis.io/download), make sure it's lis
 
 ```bash
 
+npm -g install forever
+
 # It will be on NPM when it hits a functional milestone
 npm -g install git://github.com/mrvisser/cowboy
 
