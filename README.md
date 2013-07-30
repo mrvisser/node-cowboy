@@ -8,13 +8,13 @@ First [download and install Redis](http://redis.io/download), make sure it's lis
 
 ```bash
 
-npm -g install forever
+~/Source/cowboy$npm -g install forever
 
 # It will be on NPM when it hits a functional milestone
-npm -g install git://github.com/mrvisser/cowboy
+~/Source/cowboy$npm -g install git://github.com/mrvisser/cowboy
 
 # Start the cattle server
-$ npm -g start cowboy
+~/Source/cowboy$ npm -g start cowboy
 
 # Send a ping command to all the remote cattle servers
 ~/Source/cowboy$ cowboy ping
