@@ -1,12 +1,67 @@
 
 var cowboy = require('cowboy');
-var shell = require('shelljs');
-var util = require('util');
 
 var ERR_NPM_LOAD = 1;
 var ERR_NPM_INSTALL = 2;
 var ERR_NPM_FINDMODULE_UNKNOWN = 3;
 var ERR_NPM_FINDMODULE_NOTFOUND = 4;
+
+
+
+/////////////////////////////////////////////////////////////////////////////
+// 1. INVOKED ON THE COWBOY PROCESS BEFORE SENDING COMMAND TO REMOTE NODES //
+/////////////////////////////////////////////////////////////////////////////
+
+/**
+ * Return an object that describes the help information for the plugin. The object has fields:
+ *
+ *  * description   : A String description of what the plugin does. Can be multiple lines.
+ *  * args          : A single line of text showing the args. E.g., "<required option> [<optional option>] [-v] [-d <directory>]"
+ *  * examples      : A list of strings showing ways to use the module
+ *
+ *  {
+ *      "description": "Uses npm -g to globally install a module on the cattle nodes.",
+ *      "args": "<npm module>",
+ *      "exampleArgs": ["express", "express@3.3.4", "git://github.com/visionmedia/express"]
+ *  }
+ *
+ * @return  {Object}    An object describing
+ */
+var help = module.exports.help = function() {
+    return {
+        'description': 'Uses npm to globally install a module on each cattle node. Useful for dynamically installing new cattle plugins across the cluster.',
+        'args': '<npm module name or github repository>',
+        'exampleArgs': ['express', 'express@3.3.4', 'git://github.com/visionmedia/express']
+    };
+};
+
+/**
+ * Validate the arguments with which the user invoked the command.
+ *
+ * @param  {String[]}   args    The array of arguments that are supplied for the command. These are essentially what you would receive from `process.argv`. This will never be unspecified, will always at least be an empty array.
+ * @return {String}             A string error message to display for the user, it can be multiple lines. If falsey, it will be assumed validation succeeded.
+ */
+var validate = module.exports.validate = function(args) {
+    if (!args[0]) {
+        return 'Must specify an option for the module to install.';
+    }
+};
+
+/**
+ * Specify the recommended timeout for this command (in seconds). This will override the configuration default for the command timeout,
+ * but will not override a value provided at the command line by the user.
+ *
+ * @return {Number}     The timeout (in seconds) to wait before assuming all cattle that would have responded have done so.
+ */
+var timeout = module.exports.timeout = function() {
+    return 15;
+};
+
+
+
+///////////////////////////////////////////////////////////////////////////
+// 2. INVOKED ON THE CATTLE NODES AFTER THE COMMAND HAS BEEN TRANSMITTED //
+///////////////////////////////////////////////////////////////////////////
 
 /**
  * Handle a request from the cowboy. This will be invoked on the cattle node.
@@ -49,6 +104,12 @@ var handle = module.exports.handle = function(args, done) {
     });
 };
 
+
+
+//////////////////////////////////////////////////////////////////////////////////////////////
+// 3. INVOKED ON THE CATTLE NODE AFTER THE RESPONSE HAS BEEN TRANSMITTED BACK TO THE COWBOY //
+//////////////////////////////////////////////////////////////////////////////////////////////
+
 /**
  * Perform something after the reply has been sent back to the cowboy
  *
@@ -63,6 +124,12 @@ var afterResponse = module.exports.afterResponse = function(err, code, reply) {
         cowboy.context.reboot();
     }
 };
+
+
+
+///////////////////////////////////////////////////////////////////////////////////
+// 4. INVOKED ON THE COWBOY AFTER THE RESPONSE HAS BEEN RECEIVED FROM THE CATTLE //
+///////////////////////////////////////////////////////////////////////////////////
 
 /**
  * Render a single response from a cattle node.
@@ -83,6 +150,12 @@ var renderResponse = module.exports.renderResponse = function(name, code, reply,
 
     return done();
 };
+
+
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// 5. INVOKED ON THE COWBOY AFTER ALL RESPONSES HAVE BEEN RECEIVED (OR TIMED OUT, OR USER CTRL+C) //
+////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /**
  * Provides the ability to render something on the cowboy at the end of the command lifecycle with

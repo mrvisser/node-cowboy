@@ -1,5 +1,25 @@
 
 /**
+ * Return an object that describes the help information for the plugin. The object
+ * has fields:
+ *
+ *  * description   : A String description of what the plugin does. Can be multiple lines.
+ *  * args          : A single line of text showing the args. E.g., "<required option> [<optional option>] [-v] [-d <directory>]"
+ *  * examples      : A list of strings showing ways to use the module
+ *
+ *  {
+ *      "description": "Uses npm -g to globally install a module on the cattle nodes.",
+ *      "args": "<npm module>",
+ *      "exampleArgs": ["express", "express@3.3.4", "git://github.com/visionmedia/express"]
+ *  }
+ *
+ * @return  {Object}    An object describing
+ */
+var help = module.exports.help = function() {
+    return {'description': 'Send a simple ping to cattle nodes to determine if they are active and listening.'};
+};
+
+/**
  * Handle a request from the cowboy. This will be invoked on the cattle node.
  *
  * @param  {String[]}   args        The arguments that the command was invoked with
@@ -23,21 +43,5 @@ var handle = module.exports.handle = function(args, done) {
  */
 var renderResponse = module.exports.renderResponse = function(name, code, reply, args, logger, done) {
     logger.info(reply);
-    return done();
-};
-
-/**
- * Provides the ability to render something on the cowboy at the end of the command lifecycle with
- * all the replies that were received.
- *
- * @param  {Object[]}   responses           An array of responses that were received
- * @param  {String}     responses[i].name   The name of the cattle node who gave this response
- * @param  {Number}     responses[i].code   The numeric code with which the lasso plugin exitted
- * @param  {Object}     responses[i].reply  The arbitrary reply object that was sent back with the exit code
- * @param  {String[]}   args                The arguments that the command was invoked with
- * @param  {Object}     logger              A Bunyan logger that can be used to render information to the log
- * @param  {Function}   done                Invoke this when you are done rendering
- */
-var renderComplete = module.exports.renderResponses = function(responses, args, logger, done) {
     return done();
 };

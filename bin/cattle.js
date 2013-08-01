@@ -25,7 +25,7 @@ process.on('uncaughtException', function(ex) {
 });
 
 // Load all of the lasso plugins
-cowboy.context.init(argv, function(err) {
+cowboy.context.init('cattle', argv, function(err) {
     if (err) {
         cowboy.logger.system().error({'err': err}, 'An error occurred initializing the context');
         process.exit(1);
@@ -34,7 +34,7 @@ cowboy.context.init(argv, function(err) {
     var config = cowboy.context.getConfig();
 
     // Connect to redis
-    cowboy.redis.init(config.host, config.port, config.index, config.password, function(err) {
+    cowboy.redis.init(config.redis.host, config.redis.port, config.redis.index, config.redis.password, function(err) {
         if (err) {
             cowboy.logger.system().error({'err': err}, 'An error occurred establishing a connection to redis');
             process.exit(1);

@@ -1,12 +1,18 @@
 {
-    "timeout": 5,
+    "command": {
+        "timeout": 5
+    },
+    "log": {
+        "level": "info",
+        "path": null
+    },
     "redis": {
         "host": "127.0.0.1",
         "port": 6379,
         "index": 0
     },
-    "systemLog": {
-        "level": "info",
-        "path": null
+    "restart": {
+        "cmd": "forever",
+        "args": ["restart", "bin/cattle.js"]
     }
 }

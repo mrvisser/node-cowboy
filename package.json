@@ -27,6 +27,7 @@
         "bunyan": "latest",
         "bunyan-prettystream": "latest",
         "colors": "latest",
+        "extend": "latest",
         "minimatch": "latest",
         "optimist": "latest",
         "redis": "latest",
