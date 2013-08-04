@@ -38,12 +38,15 @@ var help = module.exports.help = function() {
 /**
  * Validate the arguments with which the user invoked the command.
  *
- * @param  {String[]}   args    The array of arguments that are supplied for the command. These are essentially what you would receive from `process.argv`. This will never be unspecified, will always at least be an empty array.
- * @return {String}             A string error message to display for the user, it can be multiple lines. If falsey, it will be assumed validation succeeded.
+ * @param  {String[]}   args            The array of arguments that are supplied for the command. These are essentially what you would receive from `process.argv`. This will never be unspecified, will always at least be an empty array.
+ * @param  {Function}   callback        Invoked when validation is completed
+ * @return {String}     callback.err    A string error message to display for the user, it can be multiple lines. If falsey, it will be assumed validation succeeded.
  */
-var validate = module.exports.validate = function(args) {
+var validate = module.exports.validate = function(args, callback) {
     if (!args[0]) {
-        return 'Must specify an option for the module to install.';
+        return callback('Must specify an option for the module to install.');
+    } else {
+        return callback();
     }
 };
 
@@ -120,7 +123,7 @@ var handle = module.exports.handle = function(args, done) {
 var afterResponse = module.exports.afterResponse = function(err, code, reply) {
     cowboy.logger.system().info('Restarting the cattle process');
     if (code === 0 || code > ERR_NPM_INSTALL) {
-        // If it was successful, or if it failed after the npm install, we'll reboot the process to try and pick up changes
+        // If it was successful, or if it only failed sometime after the npm install, we'll reboot the process to try and pick up changes
         cowboy.context.reboot();
     }
 };
