@@ -30,18 +30,3 @@ var help = module.exports.help = function() {
 var handle = module.exports.handle = function(args, done) {
     return done(0, 'pong');
 };
-
-/**
- * Render a single response from a cattle node.
- *
- * @param  {String}     name    The name of the cattle node who gave this response
- * @param  {Number}     code    The numeric code with which the lasso plugin exitted
- * @param  {Object}     reply   The arbitrary reply object that was sent back with the exit code
- * @param  {String[]}   args    The arguments that the command was invoked with
- * @param  {Object}     logger  A Bunyan logger that can be used to render information to the log
- * @param  {Function}   done    Invoke this when you are done rendering
- */
-var renderResponse = module.exports.renderResponse = function(name, code, reply, args, logger, done) {
-    logger.info(reply);
-    return done();
-};

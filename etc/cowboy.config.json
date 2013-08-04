@@ -2,6 +2,9 @@
     "command": {
         "timeout": 5
     },
+    "data": {
+        "hostname": null
+    },
     "log": {
         "level": "info",
         "path": null
