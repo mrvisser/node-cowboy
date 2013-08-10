@@ -1,10 +1,19 @@
 
 var _ = require('underscore');
-var cowboy = require('cowboy');
 
 var ERR_NPM_LOAD = 1;
 var ERR_NPM_LS = 2;
 var ERR_NOT_INSTALLED = 3;
+
+/**
+ * Initialize the plugin. This will be invoked before any other method is invoked. It provides the plugin the ability
+ * to get a copy of the cowboy API and perform any initialization tasks it needs to get ready for requests.
+ *
+ * @param  {Cowboy}     cowboy          The cowboy module whose API and configuration can be used
+ */
+var init = module.exports.init = function(_cowboy) {
+    cowboy = _cowboy;
+};
 
 /**
  * Return an object that describes the help information for the plugin. The object has fields:
@@ -56,31 +65,17 @@ var handle = module.exports.handle = function(args, done) {
     var moduleName = args[0];
     var module = null;
 
-    // Load the npm context
-    cowboy.npm.load(function(err, npm) {
+    cowboy.npm.ls(function(err, modules) {
         if (err) {
-            return done(ERR_NPM_LOAD, err);
+            return done(ERR_NPM_LS, err);
         }
 
-        // Set the depth to 2 so npm ls gives us at least the version
-        npm.commands.config(['set', 'depth', '2'], function(err) {
-            if (err) {
-                return done(ERR_NPM_LOAD, err);
-            }
-
-            npm.commands.ls([], true, function(err, data, lite) {
-                if (err) {
-                    return done(ERR_NPM_LS, err);
-                }
-
-                var module = lite.dependencies[moduleName];
-                if (!module) {
-                    return done(ERR_NOT_INSTALLED);
-                } else {
-                    return done(0, module);
-                }
-            });
-        });
+        var module = modules[moduleName];
+        if (!module) {
+            return done(ERR_NOT_INSTALLED);
+        } else {
+            return done(0, module);
+        }
     });
 };
 
