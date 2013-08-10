@@ -8,10 +8,10 @@ First [download and install Redis](http://redis.io/download), make sure it's lis
 
 ```bash
 
-~/Source/cowboy$npm -g install forever
+~/Source/cowboy$ npm -g install forever
 
 # It will be on NPM when it hits a functional milestone
-~/Source/cowboy$npm -g install git://github.com/mrvisser/cowboy
+~/Source/cowboy$ npm -g install git://github.com/mrvisser/cowboy
 
 # Start the cattle server
 ~/Source/cowboy$ npm -g start cowboy
