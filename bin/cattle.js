@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 var _ = require('underscore');
-var cowboy = require('cowboy');
+var cowboy = require('../index');
 var optimist = require('optimist');
 var util = require('util');
 
@@ -25,7 +25,7 @@ process.on('uncaughtException', function(ex) {
 });
 
 // Load all of the lasso plugins
-cowboy.context.init('cattle', argv, function(err) {
+cowboy.context.init(argv, function(err) {
     if (err) {
         cowboy.logger.system().error({'err': err}, 'An error occurred initializing the context');
         process.exit(1);

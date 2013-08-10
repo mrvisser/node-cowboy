@@ -1,10 +1,25 @@
 
-var cowboy = require('cowboy');
+var ERR_NPM_INSTALL = 1;
+var ERR_NPM_FINDMODULE_UNKNOWN = 2;
+var ERR_NPM_FINDMODULE_NOTFOUND = 3;
 
-var ERR_NPM_LOAD = 1;
-var ERR_NPM_INSTALL = 2;
-var ERR_NPM_FINDMODULE_UNKNOWN = 3;
-var ERR_NPM_FINDMODULE_NOTFOUND = 4;
+var cowboy = null;
+
+
+
+///////////////////////////////////////////////////////////////////////////////
+// 0. INVOKED ON BOTH THE COWBOY PROCESS AND CATTLE PROCESS WHEN INITIALIZED //
+///////////////////////////////////////////////////////////////////////////////
+
+/**
+ * Initialize the plugin. This will be invoked before any other method is invoked. It provides the plugin the ability
+ * to get a copy of the cowboy API and perform any initialization tasks it needs to get ready for requests.
+ *
+ * @param  {Cowboy}     cowboy          The cowboy module whose API and configuration can be used
+ */
+var init = module.exports.init = function(_cowboy) {
+    cowboy = _cowboy;
+};
 
 
 
@@ -51,13 +66,13 @@ var validate = module.exports.validate = function(args, callback) {
 };
 
 /**
- * Specify the recommended timeout for this command (in seconds). This will override the configuration default for the command timeout,
- * but will not override a value provided at the command line by the user.
+ * Specify the recommended timeout for this command (in seconds). This will override the configuration default for the
+ * command timeout, but will not override a value provided at the command line by the user.
  *
  * @return {Number}     The timeout (in seconds) to wait before assuming all cattle that would have responded have done so.
  */
 var timeout = module.exports.timeout = function() {
-    return 15;
+    return 30;
 };
 
 
@@ -80,29 +95,20 @@ var handle = module.exports.handle = function(args, done) {
     // For module name lookups that didn't have versions, npm will append an @ at the end with an empty string. Look for it, too.
     var lookup = [module, module+'@'];
 
-    // Load the npm context
-    cowboy.npm.load(function(err, npm) {
+    cowboy.npm.install(module, function(err) {
         if (err) {
-            return done(ERR_NPM_LOAD, err);
+            return done(ERR_NPM_INSTALL, err);
         }
 
-        // Install the specified module
-        npm.commands.install([module], function(err, data) {
+        // Find the module in the npm node_modules directory. We can't use npm ls because the loaded npm context has everything cached
+        cowboy.npm.findModuleByFrom(lookup, function(err, packageJson) {
             if (err) {
-                return done(ERR_NPM_INSTALL, err);
+                return done(ERR_NPM_FINDMODULE_UNKNOWN, err);
+            } else if (!packageJson) {
+                return done(ERR_NPM_FINDMODULE_NOTFOUND, 'npm install completed successfully but the module was not found in the global npm directory afterward');
             }
 
-            // Find the module in the npm node_modules directory. We can't use npm ls because the loaded npm context has everything
-            // cached
-            cowboy.npm.findModule(npm, lookup, function(err, packageJson) {
-                if (err) {
-                    return done(ERR_NPM_FINDMODULE_UNKNOWN, err);
-                } else if (!packageJson) {
-                    return done(ERR_NPM_FINDMODULE_NOTFOUND, 'npm install completed successfully but the module was not found in the global npm directory afterward');
-                }
-
-                return done(0, packageJson);
-            });
+            return done(0, packageJson);
         });
     });
 };
@@ -123,7 +129,8 @@ var handle = module.exports.handle = function(args, done) {
 var afterResponse = module.exports.afterResponse = function(err, code, reply) {
     cowboy.logger.system().info('Restarting the cattle process');
     if (code === 0 || code > ERR_NPM_INSTALL) {
-        // If it was successful, or if it only failed sometime after the npm install, we'll reboot the process to try and pick up changes
+        // If it was successful, or if it only failed sometime after the npm install, we'll reboot the process to try
+        // and pick up changes
         cowboy.context.reboot();
     }
 };

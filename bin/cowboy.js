@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 var _ = require('underscore');
-var cowboy = require('cowboy');
+var cowboy = require('../index');
 var optimist = require('optimist');
 var util = require('util');
 
@@ -59,7 +59,7 @@ if (!command && !argv.list) {
 }
 
 // Initialize the cowboy context
-cowboy.context.init('cowboy', argv, function(err) {
+cowboy.context.init(argv, function(err) {
     if (err) {
         throw err;
     }
@@ -119,8 +119,8 @@ cowboy.context.init('cowboy', argv, function(err) {
         }
 
         // Apply the base renderers that give reasonable output
-        var renderResponseFunction = (_.isFunction(lasso.renderResponse)) ? lasso.renderResponse : require('cowboy/lib/renderers/default').renderResponse;
-        var renderCompleteFunction = (_.isFunction(lasso.renderComplete)) ? lasso.renderComplete : require('cowboy/lib/renderers/default').renderComplete;
+        var renderResponseFunction = (_.isFunction(lasso.renderResponse)) ? lasso.renderResponse : require('../lib/renderers/default').renderResponse;
+        var renderCompleteFunction = (_.isFunction(lasso.renderComplete)) ? lasso.renderComplete : require('../lib/renderers/default').renderComplete;
 
         var config = cowboy.context.getConfig();
 

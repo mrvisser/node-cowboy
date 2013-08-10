@@ -9,7 +9,8 @@
     },
     "scripts": {
         "start": "forever start bin/cattle.js",
-        "stop": "forever stop bin/cattle.js"
+        "stop": "forever stop bin/cattle.js",
+        "reboot": "forever restart bin/cattle.js"
     },
     "homepage": "http://www.mrvisser.ca",
     "author": {
