@@ -7,11 +7,10 @@
 First [download and install Redis](http://redis.io/download), make sure it's listening on port 6379. Then install and run cowboy:
 
 ```bash
-
 ~/Source/cowboy$ npm -g install forever
 
 # It will be on NPM when it hits a functional milestone
-~/Source/cowboy$ npm -g install git://github.com/mrvisser/cowboy
+~/Source/cowboy$ npm -g install cowboy
 
 # Start the cattle server
 ~/Source/cowboy$ npm -g start cowboy
@@ -50,16 +49,38 @@ Currently the only plugin is a `ping` plugin which is contained in the cowboy mo
 **/cowboy.json:** This simply tells cowboy where the plugins directory for this module is (relative to the root of the module).
 
 ```json
-{"plugins": "plugins"}
+{
+    "plugins": "plugins"
+}
 ```
 
 **/plugins:** This directory contains all the plugin types as directories. The only type of plugin at the moment is a `lasso` plugin, which is a plugin that will receive a command from the cowboy on the cattle, and then format the response on the cowboy. More later.
 
 **/plugins/lassos:** This directory contains all the lasso plugins as javascript files. Each file should be `<command name>.js`, where the command name is the first argument to `cowboy` (e.g., `cowboy ping` - ping is the command). Notice the file `lib/plugins/lassos/ping.js` which controls the ping command.
 
-**/plugins/lassos/ping.js:** The file that implements the lasso command. It will contain 3 methods:
+**/plugins/lassos/ping.js:** The file that implements the lasso command. It will contain 2 methods:
 
 ```javascript
+/**
+ * Return an object that describes the help information for the plugin. The object
+ * has fields:
+ *
+ *  * description   : A String description of what the plugin does. Can be multiple lines.
+ *  * args          : A single line of text showing the args. E.g., "<required option> [<optional option>] [-v] [-d <directory>]"
+ *  * examples      : A list of strings showing ways to use the module
+ *
+ *  {
+ *      "description": "Uses npm -g to globally install a module on the cattle nodes.",
+ *      "args": "<npm module>",
+ *      "exampleArgs": ["express", "express@3.3.4", "git://github.com/visionmedia/express"]
+ *  }
+ *
+ * @return  {Object}    An object describing
+ */
+var help = module.exports.help = function() {
+    return {'description': 'Send a simple ping to cattle nodes to determine if they are active and listening.'};
+};
+
 /**
  * Handle a request from the cowboy. This will be invoked on the cattle node.
  *
@@ -71,57 +92,9 @@ Currently the only plugin is a `ping` plugin which is contained in the cowboy mo
 var handle = module.exports.handle = function(args, done) {
     return done(0, 'pong');
 };
-
-/**
- * Perform something after the reply has been sent back to the cowboy
- *
- * @param  {Object}     err     An error that occurred returning a response, if any
- * @param  {Number}     code    The numeric code indicating the exit status of the handler
- * @param  {Object}     reply   The reply object that was sent by the handler
- */
-var afterResponse = module.exports.afterResponse = function(err, code, reply) { };
-
-/**
- * Render a single response from a cattle node.
- *
- * @param  {String}     name    The name of the cattle node who gave this response
- * @param  {Number}     code    The numeric code with which the lasso plugin exitted
- * @param  {Object}     reply   The arbitrary reply object that was sent back with the exit code
- * @param  {String[]}   args    The arguments that the command was invoked with
- * @param  {Function}   done    Invoke this when you are done rendering
- */
-var renderResponse = module.exports.renderResponse = function(name, code, reply, args, logger, done) {
-    logger.info(reply);
-    return done();
-};
-
-/**
- * Provides the ability to render something on the cowboy at the end of the command lifecycle with
- * all the replies that were received.
- *
- * @param  {Object[]}   responses           An array of responses that were received
- * @param  {String}     responses[i].name   The name of the cattle node who gave this response
- * @param  {Number}     responses[i].code   The numeric code with which the lasso plugin exitted
- * @param  {Object}     responses[i].reply  The arbitrary reply object that was sent back with the exit code
- * @param  {String[]}   args                The arguments that the command was invoked with
- * @param  {Function}   done                Invoke this when you are done rendering
- */
-var renderComplete = module.exports.renderResponses = function(responses, args, logger, done) {
-    return done();
-};
 ```
 
-* `handle` - This method is actually invoked on the cattle server. Every time `cowboy ping` is executed, each cattle server's handle command will be executed in `ping.js`, where it returns an exit status of `0` and a reply body of `'pong'`
-* `renderResponse` - This method is invoked on the cowboy client. It will be invoked for each cattle reply with the name (host name) of the cattle server that made the reply, response information, and a logger to use to output the response.
-* `renderComplete` - This is also invoked on the cowboy client. It will be invoked just once after the command is done listening for cattle replies. It provides an opportunity to summarize and information and render it accordingly.
-
-## Where it stands
-
-As you can see the current functionality is very basic. Also, there has been next to no testing aside from my local laptop. Next sets of features in scope (in order of priority) are:
-
-* ~~In addition to `ping`, a core plugin that allows you to install new cowboy modules.~~ It is unlikely there will be *core* modules than these 2 as they should provide everything to get started installing new plugins
-* Ability to filter which cattle servers should reply to a command
-* Ability to configure / derive more information about your cattle server ("facts") other than host, and possible integration with tools like facter
+For a more in-depth example, have a look at the [npm-install plugin](https://github.com/mrvisser/node-cowboy/blob/master/plugins/lassos/npm-install.js)
 
 ## License
 

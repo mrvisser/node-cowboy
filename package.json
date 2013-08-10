@@ -2,6 +2,19 @@
     "name": "cowboy",
     "description": "A pluggable parallel execution framework written in Node.js",
     "version": "0.0.1",
+    "homepage": "https://github.com/mrvisser/node-cowboy",
+    "author": {
+        "name": "Branden Visser",
+        "email": "mrvisser@gmail.com"
+    },
+    "license": "MIT",
+    "repository": {
+        "type": "git",
+        "url": "git://github.com/mrvisser/node-cowboy.git"
+    },
+    "bugs": {
+        "url": "https://github.com/mrvisser/node-cowboy/issues"
+    },
     "main": "./index.js",
     "bin": {
         "cowboy": "./bin/cowboy.js",
@@ -11,18 +24,6 @@
         "start": "forever start bin/cattle.js",
         "stop": "forever stop bin/cattle.js",
         "reboot": "forever restart bin/cattle.js"
-    },
-    "homepage": "http://www.mrvisser.ca",
-    "author": {
-        "name": "Branden Visser",
-        "email": "mrvisser@gmail.com"
-    },
-    "repository": {
-        "type": "git",
-        "url": "git://github.com/mrvisser/cowboy.git"
-    },
-    "bugs": {
-        "url": "https://github.com/mrvisser/cowboy/issues"
     },
     "dependencies": {
         "bunyan": "latest",
