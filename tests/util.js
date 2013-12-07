@@ -14,7 +14,7 @@ var reloadContext = module.exports.reloadContext = function(config, callback) {
     }
 
     config.modules = config.modules || {};
-    config.modules.dir = config.modules.dir || util.format('%s/.cowboy_default_modules', __dirname);
+    config.modules.dir = config.modules.dir || util.format('%s/._cowboy_default_modules', __dirname);
 
     // Destroy the context only if we were previously initialized
     cowboy.util.invokeIfNecessary(_init, cowboy.context.destroy, function(err) {
