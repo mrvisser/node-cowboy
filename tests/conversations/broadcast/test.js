@@ -17,13 +17,13 @@ describe('Conversations', function() {
             _setupRequestAndListener('test', 'test-request', null, function(listener, request) {
 
                 // When the request is received, send the response and end it
-                listener.on('request', function(request, send, end) {
+                listener.on('request', function(body, reply, end) {
                     assert.ok(!_request);
-                    assert.strictEqual(request, 'test-request');
+                    assert.strictEqual(body, 'test-request');
                     _request = true;
 
                     // Send a response
-                    send('test-response', function(err) {
+                    reply('test-response', function(err) {
                         assert.ok(!err);
                         assert.ok(!_responseCallback);
                         _responseCallback = true;
@@ -75,15 +75,16 @@ describe('Conversations', function() {
 
         describe('Listen', function() {
 
-            describe('send', function() {
+            describe('reply', function() {
+
                 it('gives an error when sending after the response has ended', function(callback) {
                     _setupRequestAndListener('test', null, null, function(listener, request) {
 
                         // Receive the request
-                        listener.on('request', function(request, send, end) {
+                        listener.on('request', function(request, reply, end) {
 
                             // Reply with "first" and ensure it succeeds as a sanity check
-                            send('first', function(err) {
+                            reply('first', function(err) {
                                 assert.ok(!err);
 
                                 // End the response
@@ -91,7 +92,7 @@ describe('Conversations', function() {
                                     assert.ok(!err);
 
                                     // Try reply frame after the end, this should fail as we already ended
-                                    send('second', function(err) {
+                                    reply('second', function(err) {
                                         assert.ok(err);
                                         return listener.close(callback);
                                     });
@@ -104,6 +105,41 @@ describe('Conversations', function() {
                             assert.strictEqual(data, 'first');
                         });
                     });
+                });
+            });
+        });
+
+        describe('Request', function() {
+
+            it('responds with no responses when it is not expecting any hosts', function(callback) {
+                var request = cowboy.conversations.broadcast.request('test', {}, {'expecting': []});
+                request.on('end', function(responses, expecting) {
+                    assert.ok(_.isEmpty(responses));
+                    assert.ok(_.isEmpty(expecting));
+                    return callback();
+                });
+            });
+
+            it('times out with an error when it receives no reply', function(callback) {
+                var request = cowboy.conversations.broadcast.request('test', null, {
+                    'expect': [cowboy.data.get('hostname')],
+                    'timeout': {
+                        'connect': 10
+                    }
+                });
+
+                // Do not bind a listener, instead let the request die after 10ms
+                request.on('ack', function() { assert.fail(); });
+                request.on('data', function() { assert.fail(); });
+                request.on('end', function() { assert.fail(); });
+
+                // Ensure we get the timeout error
+                request.on('error', function(err, expecting) {
+                    assert.ok(err);
+                    assert.strictEqual(err.message, 'Did not receive a message within the connect timeout interval of 10ms');
+                    assert.strictEqual(expecting.length, 1);
+                    assert.strictEqual(expecting[0], cowboy.data.get('hostname'));
+                    return callback();
                 });
             });
         });
