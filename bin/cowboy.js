@@ -71,7 +71,7 @@ cowboy.context.init(argv, function(err) {
 
         // Sort alphabetically by command name
         lassoNames.sort();
-        
+
         console.info('\nAvailable Lasso Plugins:\n');
         _.each(lassoNames, function(lassoName) {
             var lasso = metadata[lassoName];
@@ -127,7 +127,8 @@ cowboy.context.init(argv, function(err) {
         // Connect to redis
         cowboy.redis.init(config.redis.host, config.redis.port, config.redis.index, config.redis.password, function(err) {
             if (err) {
-                throw err;
+                cowboy.logger.system().error({'err': err}, 'Error initializing redis');
+                return cowboy.redis.destroy();
             }
 
             // Manages state for multiple responses
@@ -162,26 +163,6 @@ cowboy.context.init(argv, function(err) {
                 });
             };
 
-            // Send the command and await replies
-            cowboy.redis.request(command, args, filters, function(response) {
-                responses.push(response);
-                responseQueue.push(response);
-                _flushResponseQueue();
-            });
-
-            // Derive the timeout, with the priority-order being: command-line, lasso plugin, config file
-            var timeout = cowboy.util.getIntParam(argv.t);
-
-            // Fall back to lasso plugin
-            if (timeout === undefined && _.isFunction(lasso.timeout)) {
-                timeout = cowboy.util.getIntParam(lasso.timeout());
-            }
-
-            // Fall back to configuration
-            if (timeout === undefined) {
-                timeout = config.command.timeout;
-            }
-
             /*!
              * Finish the command and quit the process
              */
@@ -193,17 +174,34 @@ cowboy.context.init(argv, function(err) {
                 });
             };
 
-            // We are going to allow one sigint to kill just the timeout period and jump to renderComplete. So we
-            // tell the top-level handler to lay off the next sigint
-            quitOnSigint = false;
+            // First send a ping to determine who should be responding to this command
+            var timeout = cowboy.util.getIntParam(argv.t, config.command.timeout);
+            cowboy.redis.ping(command, filters, timeout, function(err, expectedNames) {
+                if (err) {
+                    cowboy.logger.system().error('Error sending ping command to redis');
+                    return cowboy.redis.destroy();
+                } else if (!_.isArray(expectedNames) || expectedNames.length === 0) {
+                    cowboy.logger.system().info('No cattle nodes will response to this request. Aborting');
+                    return cowboy.redis.destroy();
+                }
 
-            // Wait for a maximum of the configured timeout, then unbind from redis to kill the process
-            cowboy.logger.system().debug('Waiting %s seconds for responses from cattle nodes', timeout);
-            var waitTimeout = setTimeout(_terminate, timeout * 1000);
-            process.once('SIGINT', function() {
-                cowboy.logger.system().debug('Short-circuiting the timeout because of SIGINT');
-                clearTimeout(waitTimeout);
-                return _terminate();
+                cowboy.logger.system().info({'names': expectedNames}, 'Waiting for %s cattle nodes to respond', expectedNames.length);
+
+                // Invoke the command. When complete, we hit the terminate
+                cowboy.redis.command(command, args, filters, expectedNames, function(response) {
+                    // Handle each individual response
+                    responses.push(response);
+                    responseQueue.push(response);
+                    _flushResponseQueue();
+                }, _terminate);
+
+                // We give the user an opportunity to short-circuit to the renderComplete and kill gracefully with a
+                // sigint
+                quitOnSigint = false;
+                process.once('SIGINT', function() {
+                    cowboy.logger.system().debug('Short-circuiting the response listening process because of SIGINT');
+                    return _terminate();
+                });
             });
         });
     });

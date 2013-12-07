@@ -1,22 +1,16 @@
 {
-    "command": {
-        "timeout": 5
-    },
     "data": {},
     "log": {
         "level": "info",
         "path": null
     },
-    "npm": {
-        "prefix": null
+    "modules": {
+        "dir": null,
+        "npm": "npm"
     },
     "redis": {
         "host": "127.0.0.1",
         "port": 6379,
         "index": 0
-    },
-    "restart": {
-        "cmd": "npm",
-        "args": ["-g", "run-script", "cowboy", "reboot"]
     }
 }

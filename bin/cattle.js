@@ -31,50 +31,59 @@ cowboy.context.init(argv, function(err) {
         process.exit(1);
     }
 
-    var config = cowboy.context.getConfig();
+    // The cattle node will broadcast presence so the cowboy knows its existence
+    cowboy.presence.broadcast();
 
-    // Connect to redis
-    cowboy.redis.init(config.redis.host, config.redis.port, config.redis.index, config.redis.password, function(err) {
-        if (err) {
-            cowboy.logger.system().error({'err': err}, 'An error occurred establishing a connection to redis');
-            process.exit(1);
+    //////////
+    // PING //
+    //////////
+
+    // Listen and response to ping requests
+    cowboy.redis.listenPing(function(filters, command, doPong) {
+        var lasso = cowboy.context.getLassoPlugin(command);
+        if (!lasso) {
+            return cowboy.logger.system().debug('Rejecting ping because there was no plugin for command "%s"', command);
+        } else if (!_matchesFilter(filters)) {
+            return cowboy.logger.system().debug({'filters': filters}, 'Rejecting ping because it did not match the filter(s)');
         }
 
-        // Start listening for requests / commands from a cowboy client
-        cowboy.redis.listenRequest(function(filters, command, args, doPublish) {
-
-            // See if this cattle node matches the filter
-            if (!_matchesFilter(filters)) {
-                return cowboy.logger.system().debug('Rejecting message that did not match filter');
-            } else {
-                cowboy.logger.system().trace({'filters': filters}, 'Filter matched');
-            }
-
-            var lasso = cowboy.context.getLassoPlugin(command);
-            if (lasso) {
-                cowboy.logger.system().debug({'command': command, 'args': args}, 'Handling command from cowboy');
-
-                // Pass the message on to the proper lasso plugin
-                lasso.handle(args, function(code, reply) {
-
-                    // Pass the result to redis to publish the reply
-                    doPublish(cowboy.data.get('hostname'), code, reply, function(err, code, reply) {
-                        if (err) {
-                            cowboy.logger.system().error({'err': err}, 'Error publishing response back to the cowboy');
-                        }
-
-                        if (lasso.afterResponse) {
-                            lasso.afterResponse(err, code, reply);
-                        }
-                    });
-                });
-            } else {
-                cowboy.logger.system().debug({'command': command}, 'Ignoring request for which we had no handler');
-            }
-        });
-
-        cowboy.logger.system().info('Listening for redis requests');
+        cowboy.logger.system().debug({'filters': filters}, 'Sending pong for command "%s"', command);
+        return doPong(cowboy.data.get('hostname'));
     });
+
+
+
+    /////////////
+    // COMMAND //
+    /////////////
+
+    // Start listening for commands from a cowboy client
+    cowboy.redis.listenCommand(function(filters, command, args, doPublish) {
+        var lasso = cowboy.context.getLassoPlugin(command);
+        if (!lasso) {
+            return cowboy.logger.system().debug('Rejecting command because there was no plugin for command "%s"', command);
+        } else if (!_matchesFilter(filters)) {
+            return cowboy.logger.system().debug({'filters': filters}, 'Rejecting command because it did not match the filter(s)');
+        }
+
+        cowboy.logger.system().debug({'filters': filters, 'args': args}, 'Executing command "%s"', command);
+
+        // Pass the message on to the proper lasso plugin
+        lasso.handle(args, function(code, reply) {
+
+            // Pass the result to redis to publish the reply
+            doPublish(cowboy.data.get('hostname'), code, reply, function(err, code, reply) {
+                if (err) {
+                    cowboy.logger.system().error({'err': err}, 'Error publishing response back to the cowboy');
+                }
+
+                if (lasso.afterResponse) {
+                    lasso.afterResponse(err, code, reply);
+                }
+            });
+        });
+    });
+
 });
 
 /*!
@@ -89,12 +98,13 @@ var _matchesFilter = function(filters) {
     var matches = false;
     _.each(filters, function(filter) {
         var filterModule = null;
+        var requiring = util.format('../lib/filters/%s', filter.type);
+
         try {
-            var requiring = util.format('../lib/filters/%s', filter.type);
             filterModule = require(requiring);
         } catch (ex) {
             // There was no filter, simply ignore
-            cowboy.logger.system().debug('No filter found for type "%s"', filter.type);
+            cowboy.logger.system().warn('No filter found for type "%s" at path "%s"', filter.type);
             return;
         }
 

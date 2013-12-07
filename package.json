@@ -1,43 +1,48 @@
 {
-    "name": "cowboy",
-    "description": "A pluggable parallel execution framework written in Node.js",
-    "version": "0.0.2",
-    "homepage": "https://github.com/mrvisser/node-cowboy",
-    "author": {
-        "name": "Branden Visser",
-        "email": "mrvisser@gmail.com"
-    },
-    "license": "MIT",
-    "repository": {
-        "type": "git",
-        "url": "git://github.com/mrvisser/node-cowboy.git"
-    },
-    "bugs": {
-        "url": "https://github.com/mrvisser/node-cowboy/issues"
-    },
-    "main": "./index.js",
-    "bin": {
-        "cowboy": "./bin/cowboy.js",
-        "cattle": "./bin/cattle.js"
-    },
-    "scripts": {
-        "start": "forever start bin/cattle.js",
-        "stop": "forever stop bin/cattle.js",
-        "reboot": "forever restart bin/cattle.js"
-    },
-    "dependencies": {
-        "bunyan": "latest",
-        "bunyan-prettystream": "latest",
-        "colors": "latest",
-        "extend": "latest",
-        "minimatch": "latest",
-        "optimist": "latest",
-        "redis": "latest",
-        "shelljs": "latest",
-        "stripcolorcodes": "latest",
-        "underscore": "latest"
-    },
-    "engines": {
-        "node": ">=0.8"
-    }
+  "name": "cowboy",
+  "description": "A pluggable parallel execution framework written in Node.js",
+  "version": "0.0.2",
+  "homepage": "https://github.com/mrvisser/node-cowboy",
+  "author": {
+    "name": "Branden Visser",
+    "email": "mrvisser@gmail.com"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/mrvisser/node-cowboy.git"
+  },
+  "bugs": {
+    "url": "https://github.com/mrvisser/node-cowboy/issues"
+  },
+  "main": "./index.js",
+  "bin": {
+    "cowboy": "./bin/cowboy.js",
+    "cattle": "./bin/cattle.js"
+  },
+  "scripts": {
+    "start": "forever start bin/cattle.js",
+    "stop": "forever stop bin/cattle.js",
+    "reboot": "forever restart bin/cattle.js"
+  },
+  "dependencies": {
+    "bunyan": "latest",
+    "bunyan-prettystream": "latest",
+    "colors": "latest",
+    "extend": "latest",
+    "fs.extra": "latest",
+    "minimatch": "latest",
+    "optimist": "latest",
+    "redis": "latest",
+    "shelljs": "latest",
+    "stripcolorcodes": "latest",
+    "temp": "latest",
+    "underscore": "latest"
+  },
+  "engines": {
+    "node": ">=0.8"
+  },
+  "devDependencies": {
+    "grunt": "~0.4.2"
+  }
 }
