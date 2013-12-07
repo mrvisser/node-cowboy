@@ -1,0 +1,20 @@
+language: node_js
+node_js:
+  - 0.10
+
+branches:
+  only:
+    - master
+
+services:
+  - redis-server
+
+script:
+  - grunt
+
+after_failure:
+  - cat units.log | node_modules/.bin/bunyan
+
+notifications:
+  email:
+    - mrvisser@gmail.com
