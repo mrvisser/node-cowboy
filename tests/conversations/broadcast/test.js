@@ -152,7 +152,7 @@ describe('Conversations', function() {
                     assert.ok(!err);
 
                     // Make a 2nd host, host1, present
-                    presenceUtil.present('host1', function(err) {
+                    presenceUtil.present('host1', Date.now(), function(err) {
                         assert.ok(!err);
 
                         cowboy.presence.consume(function(err) {

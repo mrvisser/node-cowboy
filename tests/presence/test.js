@@ -2,6 +2,7 @@
 var _ = require('underscore');
 var assert = require('assert');
 var cowboy = require('../../index');
+var presenceUtil = require('../../lib/internal/presence');
 
 describe('Presence', function() {
 
@@ -24,6 +25,7 @@ describe('Presence', function() {
             cowboy.presence.consume(function(err) {
                 assert.ok(!err);
                 assert.ok(_.contains(cowboy.presence.hosts(), _host));
+
                 return callback();
             });
         });
@@ -127,6 +129,7 @@ describe('Presence', function() {
                         cowboy.presence.consume(function(err) {
                             assert.ok(!err);
                             assert.ok(_.isEmpty(cowboy.presence.hosts()));
+
                             return callback();
                         });
                     });
@@ -148,7 +151,7 @@ describe('Presence', function() {
             return callback();
         }
 
-        cowboy.redis.client().hset('presence', hosts.shift(), Date.now(), function(err) {
+        presenceUtil.present(hosts.shift(), Date.now(), function(err) {
             assert.ok(!err);
             return _presence(hosts, callback);
         });
@@ -160,7 +163,7 @@ describe('Presence', function() {
             return callback();
         }
 
-        cowboy.redis.client().hdel('presence', hosts.shift(), function(err) {
+        presenceUtil.absent(hosts.shift(), function(err) {
             assert.ok(!err);
             return _absence(hosts, callback);
         });
@@ -172,8 +175,8 @@ describe('Presence', function() {
             return callback();
         }
 
-        // Last entry was a minute ago for all hosts
-        cowboy.redis.client().hset('presence', hosts.shift(), Date.now() - 60000, function(err) {
+        // Set last entry as a minute ago for all hosts, which should ensure an expired entry
+        presenceUtil.present(hosts.shift(), Date.now() - 60000, function(err) {
             assert.ok(!err);
             return _expire(hosts, callback);
         });
