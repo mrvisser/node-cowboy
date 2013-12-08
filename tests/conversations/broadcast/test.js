@@ -2,6 +2,7 @@
 var _ = require('underscore');
 var assert = require('assert');
 var cowboy = require('../../../index');
+var presenceUtil = require('../../../lib/internal/presence');
 
 describe('Conversations', function() {
 
@@ -142,6 +143,55 @@ describe('Conversations', function() {
                     return callback();
                 });
             });
+
+            it('uses presence to determine expected replies', function(callback) {
+                // This test is only feasible if the timeout is pretty low. Make sure default timeout never impacts it
+                this.timeout(2000);
+
+                cowboy.presence.broadcast(function(err) {
+                    assert.ok(!err);
+
+                    // Make a 2nd host, host1, present
+                    presenceUtil.present('host1', function(err) {
+                        assert.ok(!err);
+
+                        cowboy.presence.consume(function(err) {
+                            assert.ok(!err);
+
+                            var requestOptions = {
+                                'timeout': {
+                                    'idle': 60*60*1000
+                                },
+                                'expect': null
+                            };
+
+                            // Create a request that expects a response from only host1 and idles out after a crazy amount of time
+                            _setupRequestAndListener('test', {}, requestOptions, function(listener, request) {
+                                var _request = false;
+
+                                // End our own host's (not host1's) request immediately
+                                listener.on('request', function(body, reply, end) {
+                                    assert.ok(!_request);
+                                    _request = true;
+
+                                    end(function(err) {
+                                        assert.ok(!err);
+                                    });
+                                });
+
+                                // Ensure that the request never ends because it should be waiting around for the present host host1's
+                                // response for an hour.
+                                request.on('end', function() { assert.fail(); });
+
+                                // We just make sure it hangs for at least 500ms
+                                setTimeout(function() {
+                                    listener.close(callback);
+                                }, 500);
+                            });
+                        });
+                    });
+                });
+            });
         });
     });
 });
@@ -149,7 +199,7 @@ describe('Conversations', function() {
 var _setupRequestAndListener = function(name, requestData, requestOptions, callback) {
     requestData = requestData || {};
     requestOptions = requestOptions || {};
-    requestOptions.expect = requestOptions.expect || [cowboy.data.get('hostname')];
+    requestOptions.expect = (requestOptions.expect !== undefined) ? requestOptions.expect : [cowboy.data.get('hostname')];
 
     var listener = cowboy.conversations.broadcast.listen('test');
     var request = cowboy.conversations.broadcast.request(name, requestData, requestOptions);

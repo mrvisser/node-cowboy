@@ -1,6 +1,6 @@
 ## Cowboy
 
-**This is currently undergoing significant refactoring to facilitate a more advanced communications protocol**
+**This is currently undergoing significant refactoring to facilitate a more advanced communications protocol and test harness**
 
 [![Build Status](https://travis-ci.org/mrvisser/node-cowboy.png?branch=master)](https://travis-ci.org/mrvisser/node-cowboy)
 

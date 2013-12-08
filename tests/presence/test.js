@@ -53,6 +53,31 @@ describe('Presence', function() {
         });
     });
 
+    it('removes all host entries when presence is cleared', function(callback) {
+        var hosts = ['1', '2'];
+        _presence(hosts, function() {
+
+            // Ensure the hosts' presence is consumed
+            cowboy.presence.consume(function(err) {
+                assert.ok(!err);
+                _assertArrayEqual(cowboy.presence.hosts(), hosts);
+
+                // Clear the presence
+                cowboy.presence.clear(function(err) {
+                    assert.ok(!err);
+                    assert.ok(_.isEmpty(cowboy.presence.hosts()));
+
+                    // Consume presence again to ensure the stored version is also empty
+                    cowboy.presence.consume(function(err) {
+                        assert.ok(!err);
+                        assert.ok(_.isEmpty(cowboy.presence.hosts()));
+                        return callback();
+                    });
+                });
+            });
+        });
+    });
+
     it('adds and removes multiple presence and absence entries when a number of hosts emit presence in quick succession', function(callback) {
         cowboy.presence.consume(function() {
             var hosts = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10'];
@@ -64,8 +89,7 @@ describe('Presence', function() {
                 // Consume the presence entries
                 cowboy.presence.consume(function(err) {
                     assert.ok(!err);
-                    assert.strictEqual(cowboy.presence.hosts().length, 10);
-                    assert.ok(_.chain(cowboy.presence.hosts()).difference(hosts).isEmpty().value());
+                    _assertArrayEqual(cowboy.presence.hosts(), hosts);
 
                     // Emit absence entries for all those hosts now
                     _absence(hosts, function() {
@@ -110,6 +134,13 @@ describe('Presence', function() {
             });
         });
     });
+
+    var _assertArrayEqual = function(one, other) {
+        assert.ok(_.isArray(one));
+        assert.ok(_.isArray(other));
+        assert.strictEqual(one.length, other.length);
+        assert.ok(_.chain(one).difference(other).isEmpty().value());
+    };
 
     var _presence = function(hosts, callback) {
         hosts = hosts.slice();
