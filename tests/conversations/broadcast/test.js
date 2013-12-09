@@ -134,6 +134,7 @@ describe('Conversations', function() {
                 // Do not bind a listener, instead let the request die after 10ms
                 request.on('ack', function() { assert.fail(); });
                 request.on('data', function() { assert.fail(); });
+                request.on('hostEnd', function() { assert.fail(); });
                 request.on('end', function() { assert.fail(); });
 
                 // Ensure we get the timeout error
