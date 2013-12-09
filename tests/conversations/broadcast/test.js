@@ -160,11 +160,12 @@ describe('Conversations', function() {
                         cowboy.presence.consume(function(err) {
                             assert.ok(!err);
 
+                            // We are only expecting host1, and will idle out after 100ms with no additional reply
                             var requestOptions = {
                                 'timeout': {
-                                    'idle': 60*60*1000
+                                    'idle': 100
                                 },
-                                'expect': null
+                                'expect': ['host1']
                             };
 
                             // Create a request that expects a response from only host1 and idles out after a crazy amount of time
@@ -181,14 +182,19 @@ describe('Conversations', function() {
                                     });
                                 });
 
-                                // Ensure that the request never ends because it should be waiting around for the present host host1's
-                                // response for an hour.
-                                request.on('end', function() { assert.fail(); });
+                                // Wait for the request to idle out and ensure it was still expecing host1
+                                request.on('end', function(responses, expecting) {
+                                    assert.ok(responses);
+                                    assert.ok(responses[_host()]);
+                                    assert.ok(_.isEmpty(responses[_host()]));
+                                    assert.ok(!responses['host1']);
 
-                                // We just make sure it hangs for at least 500ms
-                                setTimeout(function() {
-                                    listener.close(callback);
-                                }, 500);
+                                    // Ensure we were still expecting something from host1, even though we hadn't received an acknowledgement from it
+                                    assert.ok(expecting);
+                                    assert.strictEqual(expecting.length, 1);
+                                    assert.strictEqual('host1', expecting[0]);
+                                    return listener.close(callback);
+                                });
                             });
                         });
                     });
