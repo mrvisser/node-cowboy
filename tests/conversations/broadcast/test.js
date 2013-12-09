@@ -2,6 +2,8 @@
 var _ = require('underscore');
 var assert = require('assert');
 var cowboy = require('../../../index');
+
+var conversationsBroadcastUtil = require('../../../lib/internal/conversations.broadcast');
 var presenceUtil = require('../../../lib/internal/presence');
 
 describe('Conversations', function() {
@@ -121,7 +123,7 @@ describe('Conversations', function() {
                 });
             });
 
-            it('times out with an error when it receives no reply', function(callback) {
+            it('times out with a connect timeout error when it receives no reply', function(callback) {
                 var request = cowboy.conversations.broadcast.request('test', null, {
                     'expect': [cowboy.data.get('hostname')],
                     'timeout': {
@@ -144,7 +146,7 @@ describe('Conversations', function() {
                 });
             });
 
-            it('uses presence to determine expected replies', function(callback) {
+            it('waits for an expected host to reply', function(callback) {
                 // This test is only feasible if the timeout is pretty low. Make sure default timeout never impacts it
                 this.timeout(2000);
 
@@ -166,7 +168,7 @@ describe('Conversations', function() {
                             };
 
                             // Create a request that expects a response from only host1 and idles out after a crazy amount of time
-                            _setupRequestAndListener('test', {}, requestOptions, function(listener, request) {
+                            _setupRequestAndListener('test', null, requestOptions, function(listener, request) {
                                 var _request = false;
 
                                 // End our own host's (not host1's) request immediately
@@ -192,6 +194,47 @@ describe('Conversations', function() {
                     });
                 });
             });
+
+            it('waits for an unexpected host to finish if it received a response from it any way', function(callback) {
+                cowboy.presence.broadcast(function(err) {
+                    assert.ok(!err);
+
+                    // Send a request that idles out after a bit of time, and is only told to wait for this machine's host to reply
+                    _setupRequestAndListener('test', null, {'timeout': {'idle': 100}}, function(listener, request) {
+
+                        // Our host receives the request
+                        listener.on('request', function(body, reply, end) {
+
+                            // Set up a channel with which we can send a mock "ack" so the request will hang on it even if it wasn't expecting it
+                            var host1Channel = cowboy.redis.createChannel(conversationsBroadcastUtil.getReplyChannelName('test', request.broadcastId()));
+                            host1Channel.send({'type': 'ack', 'host': 'host1'}, function(err) {
+                                assert.ok(!err);
+
+                                // End the response from our host. This should not end the request though as we have acknowledged from another host
+                                end(function(err) { assert.ok(!err); });
+
+                                // Ensure after this end frame is received, the request eventually idles out while still expecting the rogue host1 host
+                                request.on('hostEnd', function(host, response) {
+                                    assert.strictEqual(host, _host());
+                                    assert.ok(_.isEmpty(response));
+
+                                    // Request times out
+                                    request.on('end', function(responses, expecting) {
+                                        assert.ok(responses[_host()]);
+                                        assert.ok(_.isEmpty(responses[_host()]));
+                                        assert.ok(responses['host1']);
+                                        assert.ok(_.isEmpty(responses['host1']));
+                                        assert.ok(expecting);
+                                        assert.strictEqual(expecting.length, 1);
+                                        assert.strictEqual(expecting[0], 'host1');
+                                        return listener.close(callback);
+                                    });
+                                });
+                            });
+                        });
+                    });
+                });
+            });
         });
     });
 });
@@ -200,8 +243,18 @@ var _setupRequestAndListener = function(name, requestData, requestOptions, callb
     requestData = requestData || {};
     requestOptions = requestOptions || {};
     requestOptions.expect = (requestOptions.expect !== undefined) ? requestOptions.expect : [cowboy.data.get('hostname')];
+    requestOptions.timeout = requestOptions.timeout || {};
+
+    // Set the timeouts to an unreasonable amount of time since the only tests that should "timeout successfully" are those
+    // we explicitly want to to configure to do so
+    requestOptions.timeout.connect = requestOptions.timeout.connect || 60*60*1000;
+    requestOptions.timeout.idle = requestOptions.timeout.idle || 60*60*1000;
 
     var listener = cowboy.conversations.broadcast.listen('test');
     var request = cowboy.conversations.broadcast.request(name, requestData, requestOptions);
     return callback(listener, request);
+};
+
+var _host = function() {
+    return cowboy.data.get('hostname');
 };
