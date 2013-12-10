@@ -78,34 +78,88 @@ describe('Conversations', function() {
 
         describe('Listen', function() {
 
-            describe('reply', function() {
+            it('gives an error when sending after the response has ended', function(callback) {
+                _setupRequestAndListener('test', null, null, function(listener, request) {
 
-                it('gives an error when sending after the response has ended', function(callback) {
-                    _setupRequestAndListener('test', null, null, function(listener, request) {
+                    // Receive the request
+                    listener.on('request', function(body, reply, end) {
 
-                        // Receive the request
-                        listener.on('request', function(request, reply, end) {
+                        // Reply with "first" and ensure it succeeds as a sanity check
+                        reply('first', function(err) {
+                            assert.ok(!err);
 
-                            // Reply with "first" and ensure it succeeds as a sanity check
-                            reply('first', function(err) {
+                            // End the response
+                            end(function(err) {
                                 assert.ok(!err);
 
-                                // End the response
-                                end(function(err) {
-                                    assert.ok(!err);
-
-                                    // Try reply frame after the end, this should fail as we already ended
-                                    reply('second', function(err) {
-                                        assert.ok(err);
-                                        return listener.close(callback);
-                                    });
+                                // Try reply frame after the end, this should fail as we already ended
+                                reply('second', function(err) {
+                                    assert.ok(err);
+                                    return listener.close(callback);
                                 });
                             });
                         });
+                    });
 
-                        // Ensure we never receive the "second" message on the requester side
-                        request.on('data', function(host, data) {
-                            assert.strictEqual(data, 'first');
+                    // Ensure we never receive the "second" message on the requester side
+                    request.on('data', function(host, data) {
+                        assert.strictEqual(data, 'first');
+                    });
+                });
+            });
+
+            it('can receive and respond to concurrent requests', function(callback) {
+
+                // Open up the listeners for all incoming test requests
+                var listeners = _.map([0, 1, 2, 3], function(num) {
+                    return cowboy.conversations.broadcast.listen('test' + num);
+                });
+
+                _allOnce(listeners, 'listen', function() {
+                    // Send all the requests
+                    var requests = _.map([0, 1, 2, 3], function(num) {
+                        return cowboy.conversations.broadcast.request('test' + num, num, {'expect': [_host()]});
+                    });
+
+                    _allOnce(listeners, 'request', function(allRequestArguments) {
+                        // For all requests, send a response with the corresponding index
+                        var i = 0;
+                        _.each(allRequestArguments, function(thisArguments) {
+                            var body = thisArguments[0];
+                            var reply = thisArguments[1];
+                            assert.strictEqual(body, i);
+                            reply(i, function(err) { assert.ok(!err); });
+                            i++;
+                        });
+
+                        _allOnce(requests, 'data', function(allDataArguments) {
+                            // For all replies received, ensure they come with the corresponding index
+                            i = 0;
+                            _.each(allDataArguments, function(thisArguments) {
+                                assert.strictEqual(thisArguments[0], _host());
+                                assert.strictEqual(thisArguments[1], i);
+                                i++;
+                            });
+
+                            // Send the end frame for each request
+                            _.each(allRequestArguments, function(thisArguments) {
+                                var end = thisArguments[2];
+                                end(function(err) { assert.ok(!err); });
+                            });
+
+                            // Ensure all of the requests will now end
+                            _allOnce(requests, 'end', function() {
+                                i = 0;
+                                _.each(listeners, function(listener) {
+                                    listener.close(function(err) {
+                                        assert.ok(!err);
+                                        i++;
+                                        if (i === listeners.length) {
+                                            return callback();
+                                        }
+                                    });
+                                });
+                            });
                         });
                     });
                 });
@@ -258,8 +312,22 @@ var _setupRequestAndListener = function(name, requestData, requestOptions, callb
     requestOptions.timeout.idle = requestOptions.timeout.idle || 60*60*1000;
 
     var listener = cowboy.conversations.broadcast.listen('test');
-    var request = cowboy.conversations.broadcast.request(name, requestData, requestOptions);
-    return callback(listener, request);
+    listener.once('listen', function() {
+        var request = cowboy.conversations.broadcast.request(name, requestData, requestOptions);
+        return callback(listener, request);
+    });
+};
+
+var _allOnce = function(emitters, eventName, handler) {
+    var allArguments = [];
+    _.each(emitters, function(emitter) {
+        emitter.once(eventName, function() {
+            allArguments.push(arguments);
+            if (allArguments.length === emitters.length) {
+                return handler(allArguments);
+            }
+        });
+    });
 };
 
 var _host = function() {
