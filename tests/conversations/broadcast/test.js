@@ -146,7 +146,7 @@ describe('Conversations', function() {
                                 var end = thisArguments[2];
                                 end(function(err) { assert.ok(!err); });
                             });
-
+ 
                             // Ensure all of the requests will now end
                             _allOnce(requests, 'end', function() {
                                 i = 0;

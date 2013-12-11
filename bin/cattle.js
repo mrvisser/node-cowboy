@@ -20,70 +20,44 @@ if (argv.help) {
     process.exit(0);
 }
 
-process.on('uncaughtException', function(ex) {
-    cowboy.logger.system().error({'err': ex}, 'An uncaught exception has been raised');
+process.on('uncaughtException', function(err) {
+    cowboy.logger.system().error({'err': err}, 'An uncaught exception has been raised');
 });
 
-// Load all of the lasso plugins
+// Initialize the application context
 cowboy.context.init(argv, function(err) {
     if (err) {
         cowboy.logger.system().error({'err': err}, 'An error occurred initializing the context');
         process.exit(1);
     }
 
-    // The cattle node will broadcast presence so the cowboy knows its existence
-    cowboy.presence.broadcast();
+    // Start listening to commands
+    var commandListener = cowboy.conversations.broadcast.listen('command');
+    commandListener.on('listen', function() {
+        cowboy.logger.system().info('Started listening on command channel');
 
-    //////////
-    // PING //
-    //////////
+        // Start emitting presence
+        cowboy.presence.broadcast();
 
-    // Listen and response to ping requests
-    cowboy.redis.listenPing(function(filters, command, doPong) {
-        var lasso = cowboy.context.getLassoPlugin(command);
-        if (!lasso) {
-            return cowboy.logger.system().debug('Rejecting ping because there was no plugin for command "%s"', command);
-        } else if (!_matchesFilter(filters)) {
-            return cowboy.logger.system().debug({'filters': filters}, 'Rejecting ping because it did not match the filter(s)');
-        }
+        commandListener.on('request', function(body, reply, end) {
+            var command = cowboy.plugins.command(body.commandName);
+            if (!command) {
+                cowboy.logger.system().debug({'body': body}, 'Rejecting unknown command');
+                reply('reject');
+                return end();
+            } else if (!_matchesFilter(body.filters)) {
+                cowboy.logger.system().debug({'body': body}, 'Rejecting command because of filter mismatch');
+                reply('reject');
+                return end();
+            }
 
-        cowboy.logger.system().debug({'filters': filters}, 'Sending pong for command "%s"', command);
-        return doPong(cowboy.data.get('hostname'));
-    });
+            cowboy.logger.system().debug({'body': body}, 'Accepting command');
 
-
-
-    /////////////
-    // COMMAND //
-    /////////////
-
-    // Start listening for commands from a cowboy client
-    cowboy.redis.listenCommand(function(filters, command, args, doPublish) {
-        var lasso = cowboy.context.getLassoPlugin(command);
-        if (!lasso) {
-            return cowboy.logger.system().debug('Rejecting command because there was no plugin for command "%s"', command);
-        } else if (!_matchesFilter(filters)) {
-            return cowboy.logger.system().debug({'filters': filters}, 'Rejecting command because it did not match the filter(s)');
-        }
-
-        cowboy.logger.system().debug({'filters': filters, 'args': args}, 'Executing command "%s"', command);
-
-        // Pass the message on to the proper lasso plugin
-        lasso.handle(args, function(code, reply) {
-
-            // Pass the result to redis to publish the reply
-            doPublish(cowboy.data.get('hostname'), code, reply, function(err, code, reply) {
-                if (err) {
-                    cowboy.logger.system().error({'err': err}, 'Error publishing response back to the cowboy');
-                }
-
-                if (lasso.afterResponse) {
-                    lasso.afterResponse(err, code, reply);
-                }
-            });
+            // Handle the command by first accepting and then handing over the reply and end functions to the plugin
+            reply('accept');
+            return command.handle(body.args, reply, end);
         });
     });
-
 });
 
 /*!

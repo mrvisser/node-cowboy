@@ -9,6 +9,9 @@ var util = require('util');
 
 var _installModulesDir = util.format('%s/._cowboy_test_install', __dirname);
 var _testModulesDir = util.format('%s/test_modules', __dirname);
+var _testModuleLoadingOrderDir = util.format('%s/test_module_loading_order', __dirname);
+
+var EXPECTED_CORE_COMMANDS = ['ping'];
 
 describe('Plugins', function() {
 
@@ -38,17 +41,17 @@ describe('Plugins', function() {
                 assert.ok(!err);
 
                 // Ensure the basic command does not exist yet
-                assert.ok(!cowboy.plugins.command('basic'));
+                assert.ok(!cowboy.plugins.command('test-basic'));
 
                 // Install the valid basic command
                 cowboy.modules.install(util.format('%s/node_modules/_cowboy_default_plugins_dir', _testModulesDir), function(err) {
                     assert.ok(!err);
 
-                    cowboy.plugins.once('load', function(moduleName, plugins) {
+                    cowboy.plugins.once('commands-load', function(moduleName, plugins) {
                         assert.strictEqual(moduleName, '_cowboy_default_plugins_dir');
                         assert.ok(plugins);
                         assert.ok(plugins.commands);
-                        assert.ok(plugins.commands.basic);
+                        assert.ok(plugins.commands['test-basic']);
 
                         // Ensure the command(s) for the module have been loaded
                         _assertDefaultPluginsDirModuleCommands(function() {
@@ -59,7 +62,7 @@ describe('Plugins', function() {
 
                                 cowboy.plugins.once('unload', function(name) {
                                     assert.strictEqual(name, '_cowboy_default_plugins_dir');
-                                    assert.ok(!cowboy.plugins.command('basic'));
+                                    assert.ok(!cowboy.plugins.command('test-basic'));
                                     return callback();
                                 });
                             });
@@ -86,20 +89,20 @@ describe('Plugins', function() {
                 cowboy.modules.install(util.format('%s/node_modules/_cowboy_plugin_upgrade_v1', _testModulesDir), function(err) {
                     assert.ok(!err);
 
-                    cowboy.plugins.once('load', function() {
+                    cowboy.plugins.once('commands-load', function() {
 
                         // Ensure v1 has the correct v1 functionality
-                        cowboy.plugins.command('version').handle(null, function(code, response) {
+                        cowboy.plugins.command('test-version').handle(null, function(code, response) {
                             assert.strictEqual(code, 0);
                             assert.strictEqual(response, 'version 1');
 
                             // Install version 2 and verify it loads correctly
                             cowboy.modules.install(util.format('%s/node_modules/_cowboy_plugin_upgrade_v2', _testModulesDir), function(err) {
                                 assert.ok(!err);
-                                cowboy.plugins.once('load', function() {
+                                cowboy.plugins.once('commands-load', function() {
 
                                     // Ensure the command now has the correct v2 functionality
-                                    cowboy.plugins.command('version').handle(null, function(code, response) {
+                                    cowboy.plugins.command('test-version').handle(null, function(code, response) {
                                         assert.strictEqual(code, 0);
                                         assert.strictEqual(response, 'version 2');
 
@@ -107,10 +110,10 @@ describe('Plugins', function() {
                                         cowboy.modules.install(util.format('%s/node_modules/_cowboy_plugin_upgrade_v1', _testModulesDir), function(err) {
                                             assert.ok(!err);
 
-                                            cowboy.plugins.once('load', function() {
+                                            cowboy.plugins.once('commands-load', function() {
 
                                                 // Ensure we have the v1 functionality again
-                                                cowboy.plugins.command('version').handle(null, function(code, response) {
+                                                cowboy.plugins.command('test-version').handle(null, function(code, response) {
                                                     assert.strictEqual(code, 0);
                                                     assert.strictEqual(response, 'version 1');
                                                     return callback();
@@ -125,11 +128,175 @@ describe('Plugins', function() {
                 });
             });
         });
+
+        it('loads commands from modules in a way that is consistent with install (ascending)', function(callback) {
+            this.timeout(5000);
+            return _testLoadOrdering(true, callback);
+        });
+
+        it('loads commands from modules in a way that is consistent with install (descending)', function(callback) {
+            this.timeout(5000);
+            return _testLoadOrdering(false, callback);
+        });
+
+        var _testLoadOrdering = function(asc, callback) {
+            var effectiveCommandModule = (asc) ? 'a' : 'b';
+            var duplicateCommandModule = (asc) ? 'b' : 'a';
+
+            testsUtil.reloadContext({'modules': {'dir': _installModulesDir}}, function(err) {
+                assert.ok(!err);
+
+                // Install plugin that will have the effective implementation of my-command
+                cowboy.modules.install(util.format('%s/node_modules/_cowboy_%s', _testModuleLoadingOrderDir, effectiveCommandModule), function(err) {
+                    assert.ok(!err);
+
+                    cowboy.plugins.once('commands-skip', assert.fail);
+                    cowboy.plugins.once('commands-load', function() {
+                        cowboy.plugins.removeListener('commands-skip', assert.fail);
+
+                        var numResponses = 0;
+                        var _assertResponse = function(response) {
+                            assert.strictEqual(response, util.format('module_%s', effectiveCommandModule));
+                            numResponses++;
+                        };
+
+                        // Verify we have the expected effective functionality
+                        cowboy.plugins.command('my-command').handle(null, _assertResponse, function() {
+                            assert.strictEqual(numResponses, 1);
+
+                            // Install plugin that will have the duplicate / ignored implementation of my-command
+                            cowboy.modules.install(util.format('%s/node_modules/_cowboy_%s', _testModuleLoadingOrderDir, duplicateCommandModule), function(err) {
+                                assert.ok(!err);
+
+                                // The next plugin loading attempt should skip because the module has a conflicting command
+                                cowboy.plugins.once('commands-load', assert.fail);
+                                cowboy.plugins.once('commands-skip', function(moduleName) {
+                                    cowboy.plugins.removeListener('commands-load', assert.fail);
+                                    assert.strictEqual(moduleName, util.format('_cowboy_%s', duplicateCommandModule));
+
+                                    // Verify we still have the expected effective functionality of my-command
+                                    cowboy.plugins.command('my-command').handle(null, _assertResponse, function() {
+                                        assert.strictEqual(numResponses, 2);
+
+                                        // Reload the context to ensure loading order is still consistent
+                                        testsUtil.reloadContext({'modules': {'dir': _installModulesDir}}, function(err) {
+                                            assert.ok(!err);
+
+                                            // Ensure we still have the expected effective functionality even after reload
+                                            cowboy.plugins.command('my-command').handle(null, _assertResponse, function() {
+                                                assert.strictEqual(numResponses, 3);
+                                                return callback();
+                                            });
+                                        });
+                                    });
+                                });
+                            });
+                        });
+                    });
+                });
+            });
+        };
+    });
+
+    describe('commands', function() {
+        it('can return core commands from empty plugins directory', function(callback) {
+            testsUtil.reloadContext({'modules': {'dir': _installModulesDir}}, function(err) {
+                assert.ok(!err);
+
+                var commands = cowboy.plugins.commands();
+                assert.ok(commands);
+                assert.strictEqual(commands.length, EXPECTED_CORE_COMMANDS.length);
+                for (var i = 0; i < commands.length; i++) {
+                    assert.strictEqual(commands[i], EXPECTED_CORE_COMMANDS[i]);
+                }
+
+                return callback();
+            });
+        });
+
+        it('returns all installed commands with core commands', function(callback) {
+            var commands = cowboy.plugins.commands();
+            assert.ok(commands);
+
+            // Ensure we have the core commands plus the 2 loaded in this test modules directory
+            assert.strictEqual(commands.length, EXPECTED_CORE_COMMANDS.length + 2);
+            assert.ok(_.contains(commands, 'test-basic'));
+            assert.ok(_.contains(commands, 'test-version'));
+            return callback();
+        });
+
+        it('will not override or imposter core plugin commands when installing module that overrides them', function(callback) {
+            this.timeout(5000);
+
+            var numCorePingReplies = 0;
+            var _expectCorePingReply = function(reply) {
+                assert.strictEqual(reply, 'pong');
+                numCorePingReplies++;
+            };
+
+            // First ensure we have core ping functionality in the default test_modules directory where there is one override (_cowboy_override)
+            // and one imposter (cowboy)
+            cowboy.plugins.command('ping').handle(null, _expectCorePingReply, function() {
+
+                // Reload into our install swag directory to test installing them and ensure they do not replace when installed on-the-fly
+                testsUtil.reloadContext({'modules': {'dir': _installModulesDir}}, function(err) {
+                    assert.ok(!err);
+
+                    // Ensure we have core ping in the empty install dir
+                    cowboy.plugins.command('ping').handle(null, _expectCorePingReply, function() {
+
+                        // Install override module
+                        cowboy.modules.install(util.format('%s/node_modules/_cowboy_override', _testModulesDir), function(err, module) {
+                            assert.ok(!err);
+                            assert.strictEqual(module.npm.name, '_cowboy_override');
+
+                            // Install imposter module
+                            cowboy.modules.install(util.format('%s/node_modules/cowboy', _testModulesDir), function(err, module) {
+                                assert.ok(err);
+                                assert.strictEqual(err.message, 'Cannot install cowboy module itself within the cowboy modules directory');
+                                assert.ok(!module);
+
+                                // Ensure we still get the core ping
+                                cowboy.plugins.command('ping').handle(null, _expectCorePingReply, function() {
+
+                                    // Reload the context to ensure we still have the core ping from a fresh reload
+                                    testsUtil.reloadContext({'modules': {'dir': _installModulesDir}}, function(err) {
+                                        assert.ok(!err);
+
+                                        // Ensure we still get the core ping
+                                        cowboy.plugins.command('ping').handle(null, _expectCorePingReply, function() {
+                                            // In this test we should have done 4 core ping invokations
+                                            assert.strictEqual(numCorePingReplies, 4);
+                                            return callback();
+                                        });
+                                    });
+                                });
+                            });
+                        });
+                    });
+                });
+            });
+        });
+    });
+
+    describe('command', function() {
+        it('returns a command by name', function(callback) {
+            var command = cowboy.plugins.command('test-basic');
+            assert.ok(command);
+            assert.ok(_.isFunction(command.handle));
+            return callback();
+        });
+
+        it('returns falsey when specifying invalid command', function(callback) {
+            var command = cowboy.plugins.command('non-existing-command');
+            assert.ok(!command);
+            return callback();
+        });
     });
 });
 
 var _assertDefaultPluginsDirModuleCommands = function(callback) {
-    var command = cowboy.plugins.command('basic');
+    var command = cowboy.plugins.command('test-basic');
     assert.ok(command);
     assert.strictEqual(command.help().description, 'Basic command plugin');
     command.handle(null, function(code, msg) {

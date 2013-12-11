@@ -45,11 +45,11 @@ process.on('SIGINT', function() {
     }
 });
 
-var command = argv._.shift();
+var commandName = argv._.shift();
 var args = argv._.slice();
 
-// User must specify at least a command, --help or --list
-if (!command && !argv.list) {
+// User must specify at least a commandName, --help or --list
+if (!commandName && !argv.list) {
     optimist.showHelp();
     if (argv.help) {
         return process.exit(0);
@@ -66,36 +66,35 @@ cowboy.context.init(argv, function(err) {
 
     // List all the available modules if requested
     if (argv.list) {
-        var metadata = _.values(cowboy.context.getLassoMetadata());
-        var lassoNames = _.keys(metadata);
+        var commands = cowboy.plugins.commands();
+        if (commands.length > 0) {
+            console.info('\nAvailable Command Plugins:\n');
+            _.each(commands, function(commandName) {
+                console.info('  %s', commandName);
+            });
+            console.info('\nUse "cowboy <command> --help" to show how to use a particular command');
+        } else {
+            console.info('\nThere are no available commands.');
+        }
 
-        // Sort alphabetically by command name
-        lassoNames.sort();
-
-        console.info('\nAvailable Lasso Plugins:\n');
-        _.each(lassoNames, function(lassoName) {
-            var lasso = metadata[lassoName];
-            console.info('  %s (%s)', lasso.name, lasso.version);
-        });
-        console.info('\nUse "cowboy <command> --help" to show how to use a particular command');
         process.exit(0);
     }
 
     // Get the command plugin the user is trying to execute
-    var lasso = cowboy.context.getLassoPlugin(command);
-    if (!lasso) {
-        cowboy.logger.system().error('Could not find lasso plugin for command "%s"', command);
+    var command = cowboy.plugins.command(commandName);
+    if (!command) {
+        cowboy.logger.system().error('Could not find command plugin for command "%s"', commandName);
         return process.exit(1);
     }
 
     // Invoke the help operation for the command if the user asked
     if (argv.help) {
         var commandHelp = null;
-        if (_.isFunction(lasso.help)) {
-            commandHelp = lasso.help();
+        if (_.isFunction(command.help)) {
+            commandHelp = command.help();
         }
 
-        return _printCommandHelp(command, commandHelp);
+        return _printCommandHelp(commandName, commandHelp);
     }
 
     // Validate the filter arguments
@@ -109,8 +108,9 @@ cowboy.context.init(argv, function(err) {
 
     var filters = cowboy.util.parseFilterArgs(argv);
 
-    // Validate the arguments for the lasso plugin
-    cowboy.util.validateCommandArgs(lasso, args, function(validationMessage) {
+    // Validate the arguments for the command plugin
+    var validateFunction = (_.isFunction(command.validate)) ? command.validate : function(args, callback) { return callback(); };
+    validateFunction(args, function(validationMessage) {
         if (validationMessage) {
             console.error('Error invoking command:\n');
             console.error(validationMessage);
@@ -118,89 +118,35 @@ cowboy.context.init(argv, function(err) {
             process.exit(1);
         }
 
-        // Apply the base renderers that give reasonable output
-        var renderResponseFunction = (_.isFunction(lasso.renderResponse)) ? lasso.renderResponse : require('../lib/renderers/default').renderResponse;
-        var renderCompleteFunction = (_.isFunction(lasso.renderComplete)) ? lasso.renderComplete : require('../lib/renderers/default').renderComplete;
+        // Apply default timeout and end function
+        var timeoutFunction = (_.isFunction(command.timeout)) ? command.timeout : function() { return; };
+        var endFunction = (_.isFunction(command.end)) ? command.end : function(args, responses, timedOut, done) {
+            cowboy.logger.system().info({'responses': responses}, 'Finished executing command "%s"', commandName);
+            return done();
+        };
 
-        var config = cowboy.context.getConfig();
+        var requestData = {
+            'commandName': commandName,
+            'args': args,
+            'filters': filters
+        };
 
-        // Connect to redis
-        cowboy.redis.init(config.redis.host, config.redis.port, config.redis.index, config.redis.password, function(err) {
+        var requestOptions = {
+            'timeout': {
+                'idle': (_.isFunction(command.timeout)) ? command.timeout() : null
+            }
+        };
+
+        cowboy.presence.consume(function(err) {
             if (err) {
-                cowboy.logger.system().error({'err': err}, 'Error initializing redis');
-                return cowboy.redis.destroy();
+                throw err;
             }
 
-            // Manages state for multiple responses
-            var responses = [];
-            var responseQueue = [];
-            var flushing = false;
-
-            /*!
-             * Lock and flush everything in the response queue
-             */
-            var _flushResponseQueue = function(_continuing) {
-                if (!_continuing && flushing) {
-                    // Already flushing, so don't start a new one
-                    return;
-                } else if (responseQueue.length === 0) {
-                    // We have finished flushing for now
-                    flushing = false;
-                    return;
-                }
-
-                // Indicate that we've started flushing the queue so we don't get multiple iterations on it
-                flushing = true;
-
-                // Jump into a new process tick since we're recursively invoking _flushResponseQueue and don't want
-                // to blow out the stack
-                process.nextTick(function() {
-                    var response = responseQueue.shift();
-                    var logger = cowboy.logger.cattle(response.name);
-                    renderResponseFunction(response.name, response.code, response.reply, args, logger, function() {
-                        return _flushResponseQueue(true);
-                    });
-                });
-            };
-
-            /*!
-             * Finish the command and quit the process
-             */
-            var _terminate = function() {
-                // If renderCompleteFunction hangs, we want the user to be able to terminate with sigint
-                quitOnSigint = true;
-                renderCompleteFunction(responses, args, cowboy.logger.system(), function() {
-                    cowboy.redis.destroy();
-                });
-            };
-
-            // First send a ping to determine who should be responding to this command
-            var timeout = cowboy.util.getIntParam(argv.t, config.command.timeout);
-            cowboy.redis.ping(command, filters, timeout, function(err, expectedNames) {
-                if (err) {
-                    cowboy.logger.system().error('Error sending ping command to redis');
-                    return cowboy.redis.destroy();
-                } else if (!_.isArray(expectedNames) || expectedNames.length === 0) {
-                    cowboy.logger.system().info('No cattle nodes will response to this request. Aborting');
-                    return cowboy.redis.destroy();
-                }
-
-                cowboy.logger.system().info({'names': expectedNames}, 'Waiting for %s cattle nodes to respond', expectedNames.length);
-
-                // Invoke the command. When complete, we hit the terminate
-                cowboy.redis.command(command, args, filters, expectedNames, function(response) {
-                    // Handle each individual response
-                    responses.push(response);
-                    responseQueue.push(response);
-                    _flushResponseQueue();
-                }, _terminate);
-
-                // We give the user an opportunity to short-circuit to the renderComplete and kill gracefully with a
-                // sigint
-                quitOnSigint = false;
-                process.once('SIGINT', function() {
-                    cowboy.logger.system().debug('Short-circuiting the response listening process because of SIGINT');
-                    return _terminate();
+            var commandRequest = cowboy.conversations.broadcast.request('command', requestData, requestOptions);
+            commandRequest.on('end', function(responses, expecting) {
+                endFunction(args, responses, expecting, function() {
+                    cowboy.logger.system().info('Complete');
+                    process.exit(0);
                 });
             });
         });

@@ -100,6 +100,22 @@ describe('Modules', function() {
                 return callback();
             });
         });
+
+        it('gives an error when trying to install the core cowboy module', function(callback) {
+            this.timeout(5000);
+
+            // Ensure it does not trigger an install event
+            function _fail() { assert.fail(); }
+            cowboy.modules.on('install', _fail);
+
+            // Try and install the imposter cowboy module
+            cowboy.modules.install(util.format('%s/test_modules/node_modules/cowboy', __dirname), function(err, module) {
+                assert.ok(err);
+
+                cowboy.modules.removeListener('install', _fail);
+                return callback();
+            });
+        });
     });
 
     describe('uninstall', function() {
@@ -137,7 +153,8 @@ describe('Modules', function() {
             testsUtil.reloadContext({'modules': {'dir': _installModulesDir}}, function(err) {
                 cowboy.modules.ls(function(err, modules) {
                     assert.ok(!err);
-                    assert.strictEqual(modules.length, 0);
+                    assert.strictEqual(modules.length, 1);
+                    assert.strictEqual(modules[0].npm.name, 'cowboy');
                     return callback();
                 });
             });
@@ -146,7 +163,7 @@ describe('Modules', function() {
         it('lists healthy modules while filtering out unhealthy modules', function(callback) {
             cowboy.modules.ls(function(err, modules) {
                 assert.ok(!err);
-                assert.strictEqual(modules.length, 2);
+                assert.strictEqual(modules.length, 3);
 
                 var hasTest1 = false;
                 var hasTest2 = false;
@@ -167,6 +184,29 @@ describe('Modules', function() {
                 assert.ok(hasTest2, 'Expected to get test2 module');
 
                 return callback();
+            });
+        });
+
+        it('ignores the core cowboy module in its module loading directory if it accidentally exists', function(callback) {
+            this.timeout(5000);
+
+            testsUtil.reloadContext({'modules': {'dir': _installModulesDir}}, function(err) {
+                assert.ok(!err);
+
+                // Install our imposter cowboy module and ensure the installed version of the module still comes from our runtime cowboy module
+                cowboy.modules.install(util.format('%s/test_modules/node_modules/cowboy', __dirname), function(err, module) {
+                    assert.ok(err);
+
+                    cowboy.modules.ls(function(err, modules) {
+                        assert.ok(!err);
+
+                        // Ensure we have a cowboy module and it is the legitimate version, not the imposter installed version
+                        var cowboyModule = _.find(modules, function(module) { return (module.npm.name === 'cowboy'); });
+                        assert.ok(cowboyModule);
+                        assert.strictEqual(require(util.format('%s/../../package', __dirname)).version, cowboyModule.npm.version);
+                        return callback();
+                    });
+                });
             });
         });
     });
