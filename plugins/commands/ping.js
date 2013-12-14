@@ -42,7 +42,7 @@ Command.prototype.help = function() {
  * @param  {Function}       [end.callback]          Invoked when the end frame has been sent to the cowboy client
  * @param  {Error}          [end.callback.err]      An error that occured while sending the end frame, if any
  */
-Command.prototype.handle = function(ctx, reply, done) {
+Command.prototype.exec = function(ctx, reply, done) {
     reply('pong');
     return done();
 };
@@ -65,7 +65,7 @@ Command.prototype.hostEnd = function(ctx, host, response, done) {
  * @param  {Object}         responses   The responses object that that represents all reply frames from each
  *                                      cattle host. The object is keyed by the cattle node hostname, and the
  *                                      value is an array of Object's, each object representing an invokation
- *                                      of `reply` by the cattle node's `handle` method
+ *                                      of `reply` by the cattle node's `exec` method
  * @param  {String[]}       expired     A list of cattle node hostnames who failed to reply to the command
  *                                      within the idle expiry timeframe
  * @param  {Function}       done        Invoked when the function is complete

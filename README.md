@@ -93,7 +93,7 @@ var help = module.exports.help = function() {
  * @param  {Number}     done.code   A numeric code indicating the exit status. 0 should indicate success, anything above 0 should indicate some plugin-specific error code.
  * @param  {Object}     done.reply  The reply that goes along with the code. Can be any arbitrary String or Object
  */
-var handle = module.exports.handle = function(args, done) {
+var handle = module.exports.exec = function(args, done) {
     return done(0, 'pong');
 };
 ```

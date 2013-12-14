@@ -59,7 +59,7 @@ cowboy.context.init(argv, function(err) {
 
             // Handle the command by first accepting and then handing over the reply and end functions to the plugin
             reply('accept');
-            return command.handle(new CommandContext(body.args), reply, end);
+            return command.exec(new CommandContext(body.args), reply, end);
         });
     });
 });
