@@ -3,12 +3,7 @@ var _ = require('underscore');
 var colors = require('colors');
 var sprintf = require('sprintf-js').sprintf;
 
-var Command = module.exports = function() {
-    this._responseLatencies = {};
-    this._start = Date.now();
-
-    console.log(sprintf('%-25s Latency'.bold.underline, 'Host'));
-};
+var Command = module.exports = function() {};
 
 /**
  * Return an object that describes the help information for the plugin. The object
@@ -31,6 +26,20 @@ Command.prototype.help = function() {
 };
 
 /**
+ * Invoked on the cowboy before the command is sent to the cattle nodes.
+ *
+ * @param  {CommandContext} ctx         The command context of the current command
+ * @param  {Function}       done        Invoked when the command has finished processing
+ */
+Command.prototype.before = function(ctx, done) {
+    this._responseLatencies = {};
+    this._start = Date.now();
+
+    console.log(sprintf('%-25s Latency'.bold.underline, 'Host'));
+    return done();
+};
+
+/**
  * Handle a request from the cowboy. This will be invoked on the cattle node.
  *
  * @param  {CommandContext} ctx                     The command context of the current command
@@ -38,9 +47,9 @@ Command.prototype.help = function() {
  * @param  {Object}         reply.data              The reply data to send
  * @param  {Function}       [reply.callback]        Invoked when the reply has been sent
  * @param  {Error}          [reply.callback.err]    An error that occurred while sending the reply frame, if any
- * @param  {Function}       end                     Invoked when the command has finished processing
- * @param  {Function}       [end.callback]          Invoked when the end frame has been sent to the cowboy client
- * @param  {Error}          [end.callback.err]      An error that occured while sending the end frame, if any
+ * @param  {Function}       done                    Invoked when the command has finished processing
+ * @param  {Function}       [done.callback]         Invoked when the end frame has been sent to the cowboy client
+ * @param  {Error}          [done.callback.err]     An error that occured while sending the end frame, if any
  */
 Command.prototype.exec = function(ctx, reply, done) {
     reply('pong');
@@ -99,10 +108,10 @@ Command.prototype.end = function(ctx, responses, expired, done) {
     console.log('');
     console.log('Ping Statistics:'.bold.underline);
     if (!_.isEmpty(latencies)) {
-        console.log(sprintf('Avg: %6.2fms', avg));
-        console.log(sprintf('Min: %6dms', min));
-        console.log(sprintf('Max: %6dms', max));
+        console.log(sprintf('Avg: %.2fms', avg));
+        console.log(sprintf('Min: %dms', min));
+        console.log(sprintf('Max: %dms', max));
     }
-    console.log(sprintf('Tmt: %6d', timedout));
+    console.log(sprintf('Tmt: %d', timedout));
     done();
 };

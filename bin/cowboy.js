@@ -9,14 +9,13 @@ var CommandContext = require('../lib/model/command-context');
 
 var optimist = require('optimist')
     .usage(
-        'Usage: cowboy --help | --list | <command> [--help] | <command> [-c <config file>] [-t <seconds>] [--log-level <level>] [--log-path <path>] [-- <command specific args>]\n\n' +
+        'Usage: cowboy --help | --list | <command> [--help] | <command> [-c <config file>] [--log-level <level>] [--log-path <path>] [-- <command specific args>]\n\n' +
         
         'Examples:\n\n' +
         '  cowboy --help\n' +
         '  cowboy --list\n' +
         '  cowboy npm-install --help\n' +
-        '  cowboy npm-install -- express@3.3.4\n' +
-        '  cowboy npm-install -t 30 -- express@3.3.4')
+        '  cowboy npm-install -- express@3.3.4\n')
 
     .describe('help', 'Display help content for either cowboy or the command if specified')
     .describe('list', 'List all lasso plugins installed on the cowboy (not necessarily installed on the remote cattle)')
@@ -31,13 +30,10 @@ var optimist = require('optimist')
 require('../lib/filters/hosts').args(optimist);
 var argv = optimist.argv;
 
-/**
 process.on('uncaughtException', function(err) {
     cowboy.logger.system().error({'err': err}, 'An uncaught exception has been raised');
-    /*process.nextTick(function() {
-        process.exit(1);
-    });*/
-//});
+    process.exit(1);
+});
 
 var quitOnSigint = true;
 process.on('SIGINT', function() {
@@ -122,15 +118,18 @@ cowboy.context.init(argv, function(err) {
             process.exit(1);
         }
 
+        // Resolve the "before" function
+        var beforeFunction = (_.isFunction(command.before)) ? command.before : function(ctx, done) {
+            return done();
+        };
+
         // Resolve the "hostEnd" function
         var hostEndFunction = (_.isFunction(command.hostEnd)) ? command.hostEnd : function(ctx, host, response, done) {
-            cowboy.logger.system().info({'host': host, 'response': response}, 'Host finished executing command "%s"', commandName);
             return done();
         };
 
         // Resolve the "end" function
         var endFunction = (_.isFunction(command.end)) ? command.end : function(ctx, responses, expired, done) {
-            cowboy.logger.system().info({'responses': responses}, 'Finished executing command "%s"', commandName);
             return done();
         };
 
@@ -155,89 +154,91 @@ cowboy.context.init(argv, function(err) {
             var rejected = {};
 
             var ctx = new CommandContext(requestData.args);
-            var commandRequest = cowboy.conversations.broadcast.request('command', requestData, requestOptions);
+            beforeFunction.call(command, ctx, function() {
+                var commandRequest = cowboy.conversations.broadcast.request('command', requestData, requestOptions);
 
-            // When a host returns any "data" frame
-            commandRequest.on('data', function(host, body) {
-                if (body === 'accept' && !accepted[host]) {
-                    cowboy.logger.system().trace('Host "%s" has accepted the request filter', host);
-                    accepted[host] = true;
-                } else if (body === 'reject') {
-                    cowboy.logger.system().trace('Host "%s" has accepted the request filter', host);
-                    rejected[host] = true;
-                }
-            });
+                // When a host returns any "data" frame
+                commandRequest.on('data', function(host, body) {
+                    if (body === 'accept' && !accepted[host]) {
+                        cowboy.logger.system().trace('Host "%s" has accepted the request filter', host);
+                        accepted[host] = true;
+                    } else if (body === 'reject') {
+                        cowboy.logger.system().trace('Host "%s" has accepted the request filter', host);
+                        rejected[host] = true;
+                    }
+                });
 
-            var processing = false;
-            var processingQueue = [];
-            var processQueue = function() {
-                // If already processing, let it be
-                if (processing) {
-                    return;
-                }
+                var processing = false;
+                var processingQueue = [];
+                var processQueue = function() {
+                    // If already processing, let it be
+                    if (processing) {
+                        return;
+                    }
 
-                // Indicate that we're processing
-                processing = true;
+                    // Indicate that we're processing
+                    processing = true;
 
-                // Take the next operation, if it's empty, we just finish processing
-                var operation = processingQueue.shift();
-                if (!operation) {
-                    processing = false;
-                    return;
-                }
-
-                // We have an operation, invoke it
-                operation.method.apply(command, _.union(operation.args, function() {
-                    if (_.isFunction(operation.done)) {
-                        // If there was a `done` function on this operation, we forcefully terminate processing here
-                        return operation.done();
-                    } else {
-                        // If there was not a `done` function, we just continue along with the processing queue
+                    // Take the next operation, if it's empty, we just finish processing
+                    var operation = processingQueue.shift();
+                    if (!operation) {
                         processing = false;
-                        return processQueue();
+                        return;
                     }
-                }));
-            };
 
-            // When any host has submit their "end" frame
-            commandRequest.on('hostEnd', function(host, response) {
-                processingQueue.push({
-                    'method': hostEndFunction,
-                    'args': [ctx, host, response]
+                    // We have an operation, invoke it
+                    operation.method.apply(command, _.union(operation.args, function() {
+                        if (_.isFunction(operation.done)) {
+                            // If there was a `done` function on this operation, we forcefully terminate processing here
+                            return operation.done();
+                        } else {
+                            // If there was not a `done` function, we just continue along with the processing queue
+                            processing = false;
+                            return processQueue();
+                        }
+                    }));
+                };
+
+                // When any host has submit their "end" frame
+                commandRequest.on('hostEnd', function(host, response) {
+                    processingQueue.push({
+                        'method': hostEndFunction,
+                        'args': [ctx, host, response]
+                    });
+
+                    return processQueue();
                 });
 
-                return processQueue();
-            });
+                // When all hosts have submit their "end" frame or have timed out
+                commandRequest.on('end', function(responses, expecting) {
 
-            // When all hosts have submit their "end" frame or have timed out
-            commandRequest.on('end', function(responses, expecting) {
+                    // Amend the responses to remove internal cowboy-cattle communication frames
+                    _.each(responses, function(response, host) {
+                        if (response[0] === 'accept') {
+                            // If the host accepted the frame, we will return its response. Slice out the first frame
+                            responses[host] = response.slice(1);
+                        } else if (response[0] === 'reject') {
+                            // If the host rejected the frame, we will ignore its response. Delete it
+                            delete responses[host];
+                        } else {
+                            // This shouldn't happen :(
+                            cowboy.logger.system().warn('Received invalid initial frame from host "%s". Ignoring response', host);
+                            delete responses[host];
+                        }
+                    });
 
-                // Amend the responses to remove internal cowboy-cattle communication frames
-                _.each(responses, function(response, host) {
-                    if (response[0] === 'accept') {
-                        // If the host accepted the frame, we will return its response. Slice out the first frame
-                        responses[host] = response.slice(1);
-                    } else if (response[0] === 'reject') {
-                        // If the host rejected the frame, we will ignore its response. Delete it
-                        delete responses[host];
-                    } else {
-                        // This shouldn't happen :(
-                        cowboy.logger.system().warn('Received invalid initial frame from host "%s". Ignoring response', host);
-                        delete responses[host];
-                    }
+                    // Push the final end frame onto the processing queue
+                    processingQueue.push({
+                        'method': endFunction,
+                        'args': [ctx, responses, expecting],
+                        'done': function() {
+                            cowboy.logger.system().info('Complete');
+                            process.exit(0);
+                        }
+                    });
+
+                    return processQueue();
                 });
-
-                // Push the final end frame onto the processing queue
-                processingQueue.push({
-                    'method': endFunction,
-                    'args': [ctx, responses, expecting],
-                    'done': function() {
-                        cowboy.logger.system().info('Complete');
-                        process.exit(0);
-                    }
-                });
-
-                return processQueue();
             });
         });
     });
