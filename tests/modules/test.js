@@ -82,10 +82,12 @@ describe('Modules', function() {
             // Install the local _cowboy_test1 module and ensure it emits the event
             var installUri = util.format('%s/test_modules/node_modules/_cowboy_test1', __dirname);
             cowboy.modules.install(installUri);
-            cowboy.modules.once('install', function(uri, module) {
+            cowboy.modules.onModuleInstall('test', function(uri, module, done) {
+                cowboy.modules.offModuleInstall('test');
                 assert.strictEqual(uri, installUri);
                 assert.ok(fs.existsSync(util.format('%s/node_modules/_cowboy_test1+%s/package.json', _installModulesDir, module.timestamp)));
                 _validateModuleTest1(module, _installModulesDir, module.timestamp);
+                done();
                 return callback();
             });
         });
@@ -106,13 +108,13 @@ describe('Modules', function() {
 
             // Ensure it does not trigger an install event
             function _fail() { assert.fail(); }
-            cowboy.modules.on('install', _fail);
+            cowboy.modules.onModuleInstall('test', _fail);
 
             // Try and install the imposter cowboy module
             cowboy.modules.install(util.format('%s/test_modules/node_modules/cowboy', __dirname), function(err, module) {
                 assert.ok(err);
 
-                cowboy.modules.removeListener('install', _fail);
+                cowboy.modules.offModuleInstall('test');
                 return callback();
             });
         });

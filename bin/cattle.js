@@ -5,6 +5,8 @@ var cowboy = require('../index');
 var optimist = require('optimist');
 var util = require('util');
 
+var CommandContext = require('../lib/model/command-context');
+
 var argv = optimist
     .usage('Usage: cattle [--config <config file>] [--log-level <level>] [--log-path <path>]')
 
@@ -40,8 +42,8 @@ cowboy.context.init(argv, function(err) {
         cowboy.presence.broadcast();
 
         commandListener.on('request', function(body, reply, end) {
-            var command = cowboy.plugins.command(body.commandName);
-            if (!command) {
+            var Command = cowboy.plugins.command(body.commandName);
+            if (!Command) {
                 cowboy.logger.system().debug({'body': body}, 'Rejecting unknown command');
                 reply('reject');
                 return end();
@@ -53,9 +55,11 @@ cowboy.context.init(argv, function(err) {
 
             cowboy.logger.system().debug({'body': body}, 'Accepting command');
 
+            var command = new Command();
+
             // Handle the command by first accepting and then handing over the reply and end functions to the plugin
             reply('accept');
-            return command.handle(body.args, reply, end);
+            return command.handle(new CommandContext(body.args), reply, end);
         });
     });
 });

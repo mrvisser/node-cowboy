@@ -5,6 +5,8 @@ var cowboy = require('../index');
 var optimist = require('optimist');
 var util = require('util');
 
+var CommandContext = require('../lib/model/command-context');
+
 var optimist = require('optimist')
     .usage(
         'Usage: cowboy --help | --list | <command> [--help] | <command> [-c <config file>] [-t <seconds>] [--log-level <level>] [--log-path <path>] [-- <command specific args>]\n\n' +
@@ -22,9 +24,6 @@ var optimist = require('optimist')
     .alias('c', 'config')
     .describe('config', 'The configuration file to use. All configuration provided at the command line will override entries in the config file.')
 
-    .alias('t', 'timeout')
-    .describe('timeout', 'The maximum amount of time to wait (in seconds) to receive all responses. Leave this number high and use CTRL+C to break early')
-
     .describe('log-level', 'The system log level. One of trace, debug, info, warn or error')
     .describe('log-path', 'The path to a file to log to. If unspecified, will log to stdout');
 
@@ -32,10 +31,13 @@ var optimist = require('optimist')
 require('../lib/filters/hosts').args(optimist);
 var argv = optimist.argv;
 
-process.on('uncaughtException', function(ex) {
-    cowboy.logger.system().error({'err': ex}, 'An uncaught exception has been raised');
-    process.exit(1);
-});
+/**
+process.on('uncaughtException', function(err) {
+    cowboy.logger.system().error({'err': err}, 'An uncaught exception has been raised');
+    /*process.nextTick(function() {
+        process.exit(1);
+    });*/
+//});
 
 var quitOnSigint = true;
 process.on('SIGINT', function() {
@@ -81,11 +83,13 @@ cowboy.context.init(argv, function(err) {
     }
 
     // Get the command plugin the user is trying to execute
-    var command = cowboy.plugins.command(commandName);
-    if (!command) {
+    var Command = cowboy.plugins.command(commandName);
+    if (!Command) {
         cowboy.logger.system().error('Could not find command plugin for command "%s"', commandName);
         return process.exit(1);
     }
+
+    var command = new Command();
 
     // Invoke the help operation for the command if the user asked
     if (argv.help) {
@@ -118,9 +122,14 @@ cowboy.context.init(argv, function(err) {
             process.exit(1);
         }
 
-        // Apply default timeout and end function
-        var timeoutFunction = (_.isFunction(command.timeout)) ? command.timeout : function() { return; };
-        var endFunction = (_.isFunction(command.end)) ? command.end : function(args, responses, timedOut, done) {
+        // Resolve the "hostEnd" function
+        var hostEndFunction = (_.isFunction(command.hostEnd)) ? command.hostEnd : function(ctx, host, response, done) {
+            cowboy.logger.system().info({'host': host, 'response': response}, 'Host finished executing command "%s"', commandName);
+            return done();
+        };
+
+        // Resolve the "end" function
+        var endFunction = (_.isFunction(command.end)) ? command.end : function(ctx, responses, expired, done) {
             cowboy.logger.system().info({'responses': responses}, 'Finished executing command "%s"', commandName);
             return done();
         };
@@ -142,12 +151,93 @@ cowboy.context.init(argv, function(err) {
                 throw err;
             }
 
+            var accepted = {};
+            var rejected = {};
+
+            var ctx = new CommandContext(requestData.args);
             var commandRequest = cowboy.conversations.broadcast.request('command', requestData, requestOptions);
-            commandRequest.on('end', function(responses, expecting) {
-                endFunction(args, responses, expecting, function() {
-                    cowboy.logger.system().info('Complete');
-                    process.exit(0);
+
+            // When a host returns any "data" frame
+            commandRequest.on('data', function(host, body) {
+                if (body === 'accept' && !accepted[host]) {
+                    cowboy.logger.system().trace('Host "%s" has accepted the request filter', host);
+                    accepted[host] = true;
+                } else if (body === 'reject') {
+                    cowboy.logger.system().trace('Host "%s" has accepted the request filter', host);
+                    rejected[host] = true;
+                }
+            });
+
+            var processing = false;
+            var processingQueue = [];
+            var processQueue = function() {
+                // If already processing, let it be
+                if (processing) {
+                    return;
+                }
+
+                // Indicate that we're processing
+                processing = true;
+
+                // Take the next operation, if it's empty, we just finish processing
+                var operation = processingQueue.shift();
+                if (!operation) {
+                    processing = false;
+                    return;
+                }
+
+                // We have an operation, invoke it
+                operation.method.apply(command, _.union(operation.args, function() {
+                    if (_.isFunction(operation.done)) {
+                        // If there was a `done` function on this operation, we forcefully terminate processing here
+                        return operation.done();
+                    } else {
+                        // If there was not a `done` function, we just continue along with the processing queue
+                        processing = false;
+                        return processQueue();
+                    }
+                }));
+            };
+
+            // When any host has submit their "end" frame
+            commandRequest.on('hostEnd', function(host, response) {
+                processingQueue.push({
+                    'method': hostEndFunction,
+                    'args': [ctx, host, response]
                 });
+
+                return processQueue();
+            });
+
+            // When all hosts have submit their "end" frame or have timed out
+            commandRequest.on('end', function(responses, expecting) {
+
+                // Amend the responses to remove internal cowboy-cattle communication frames
+                _.each(responses, function(response, host) {
+                    if (response[0] === 'accept') {
+                        // If the host accepted the frame, we will return its response. Slice out the first frame
+                        responses[host] = response.slice(1);
+                    } else if (response[0] === 'reject') {
+                        // If the host rejected the frame, we will ignore its response. Delete it
+                        delete responses[host];
+                    } else {
+                        // This shouldn't happen :(
+                        cowboy.logger.system().warn('Received invalid initial frame from host "%s". Ignoring response', host);
+                        delete responses[host];
+                    }
+                });
+
+                // Push the final end frame onto the processing queue
+                processingQueue.push({
+                    'method': endFunction,
+                    'args': [ctx, responses, expecting],
+                    'done': function() {
+                        cowboy.logger.system().info('Complete');
+                        process.exit(0);
+                    }
+                });
+
+                return processQueue();
             });
         });
     });
@@ -157,23 +247,23 @@ cowboy.context.init(argv, function(err) {
  * Print the formatted help object to the console.
  */
 var _printCommandHelp = function(command, help) {
-    var helpString = '';
+    var helpString = '\n';
     if (help) {
         if (help.description) {
-            helpString = util.format('%s\n\n', help.description);
+            helpString += util.format('%s\n\n', help.description);
         }
 
         help.args = help.args || '';
         helpString += util.format('cowboy %s', command);
 
         if (help.args) {
-            helpString += util.format(' -- %s\n\n', help.args);
+            helpString += util.format(' -- %s\n', help.args);
         } else {
-            helpString += '\n\n';
+            helpString += '\n';
         }
 
-        if (_.isArray(help.exampleArgs) && help.exampleArgs.length > 0) {
-            helpString += 'Example use:\n\n';
+        if (_.isArray(help.exampleArgs) && !_.isEmpty(help.exampleArgs)) {
+            helpString += '\nExample use:\n\n';
             _.each(help.exampleArgs, function(exampleArgs) {
                 helpString += util.format('cowboy %s -- %s\n', command, exampleArgs);
             });
