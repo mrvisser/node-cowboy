@@ -113,5 +113,5 @@ Command.prototype.end = function(ctx, responses, expired, done) {
         console.log(sprintf('Max: %dms', max));
     }
     console.log(sprintf('Tmt: %d', timedout));
-    done();
+    return done();
 };
