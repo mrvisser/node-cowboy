@@ -5,7 +5,7 @@ var cowboy = require('../index');
 var optimist = require('optimist');
 var util = require('util');
 
-var CommandContext = require('../lib/model/command-context');
+var CommandContext = require('../lib/internal/command-context');
 
 var argv = optimist
     .usage('Usage: cattle [--config <config file>] [--log-level <level>] [--log-path <path>]')
@@ -61,6 +61,11 @@ cowboy.context.init(argv, function(err) {
             reply('accept');
             return command.exec(new CommandContext(body.args), reply, end);
         });
+
+        // Indicate to the master process that we've started up
+        if (process.send) {
+            process.send('ready');
+        }
     });
 });
 

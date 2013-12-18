@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 var cowboy = require('../index');
+var util = require('util');
 
 process.on('uncaughtException', function(err) {
     cowboy.logger.system().error({'err': err}, 'An uncaught exception has been raised');

@@ -22,7 +22,6 @@
   },
   "dependencies": {
     "bunyan": "latest",
-    "bunyan-prettystream": "latest",
     "colors": "latest",
     "extend": "latest",
     "fs.extra": "latest",
@@ -39,6 +38,7 @@
     "node": ">=0.8"
   },
   "devDependencies": {
+    "cowboy-cli-api": "latest",
     "grunt": "~0.4.2",
     "grunt-mocha-test": "latest"
   }
