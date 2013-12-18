@@ -118,25 +118,27 @@ describe('CLI', function() {
 
             it('filters based on a plain string', function(callback) {
                 // Start a second cattle server with custom host
-                var secondCattleConfig = _.extend({}, _defaultCattleConfig, {'data': {'hostname': 'test-host'}});
+                var secondHostName = 'test-host-' + Math.floor(Math.random() * 1000);
+                var secondCattleConfig = _.extend({}, _defaultCattleConfig, {'data': {'hostname': secondHostName}});
                 cowboyCli.cattle(secondCattleConfig, function(err, kill) {
                     assert.ok(!err);
 
-                    // Verify we only get test-host
-                    cowboyCli.cowboy(_defaultCowboyConfig, ['-H', 'test-host'], 'ping', function(code, output) {
-                        assert.strictEqual(code, 0);
-                        _assertPingOutput(output, ['test-host'], [cowboy.data.get('hostname')]);
-
-                        // Verify we get no hosts
-                        cowboyCli.cowboy(_defaultCowboyConfig, ['-H', 'test'], 'ping', function(code, output) {
-                            assert.strictEqual(code, 0);
-                            assert.strictEqual(output.split('\n').length, 5);
-
-                            // Verify we get our local host and test-host with 2 filters
-                            cowboyCli.cowboy(_defaultCowboyConfig, ['-H', 'test-host', '-H', cowboy.data.get('hostname')], 'ping', function(code, output) {
-                                assert.strictEqual(code, 0);
-                                _assertPingOutput(output, ['test-host', cowboy.data.get('hostname')], []);
+                    cowboyCli.cowboy(_defaultCowboyConfig, ['-H', secondHostName], 'ping', function(codeOnlyTestHost, outputOnlyTestHost) {
+                        cowboyCli.cowboy(_defaultCowboyConfig, ['-H', 'test'], 'ping', function(codeNoHosts, outputNoHosts) {
+                            cowboyCli.cowboy(_defaultCowboyConfig, ['-H', secondHostName, '-H', cowboy.data.get('hostname')], 'ping', function(codeBothHosts, outputBothHosts) {
                                 kill(false, function(code, signal) {
+
+                                    // The first invokation should have only the test host
+                                    assert.strictEqual(codeOnlyTestHost, 0);
+                                    _assertPingOutput(outputOnlyTestHost, [secondHostName], [cowboy.data.get('hostname')]);
+
+                                    // The second invokation should not have matched any hosts
+                                    assert.strictEqual(codeNoHosts, 0);
+                                    assert.strictEqual(outputNoHosts.split('\n').length, 5);
+
+                                    // The third invokation should have matched both hosts
+                                    assert.strictEqual(codeBothHosts, 0);
+                                    _assertPingOutput(outputBothHosts, [secondHostName, cowboy.data.get('hostname')], []);
                                     return callback();
                                 });
                             });
@@ -145,6 +147,38 @@ describe('CLI', function() {
                 });
             });
 
+            it('filters based on a regular expression', function(callback) {
+                // Start a second cattle server with custom host
+                var nonce = Math.floor(Math.random() * 1000);
+                var secondHostName = 'test-host-' + nonce;
+                var secondCattleConfig = _.extend({}, _defaultCattleConfig, {'data': {'hostname': secondHostName}});
+                cowboyCli.cattle(secondCattleConfig, function(err, kill) {
+                    assert.ok(!err);
+
+                    // Verify we only get test-host
+                    cowboyCli.cowboy(_defaultCowboyConfig, ['-H', util.format('/^.*%d$/', nonce)], 'ping', function(codeOnlyTestHost, outputOnlyTestHost) {
+                        cowboyCli.cowboy(_defaultCowboyConfig, ['-H', util.format('/^%d/', nonce)], 'ping', function(codeNoHosts, outputNoHosts) {
+                            cowboyCli.cowboy(_defaultCowboyConfig, ['-H', util.format('/^%s$/', secondHostName), '-H', util.format('/^%s$/', cowboy.data.get('hostname'))], 'ping', function(codeBothHosts, outputBothHosts) {
+                                kill(false, function(code, signal) {
+
+                                    // The first invokation should have only the test host
+                                    assert.strictEqual(codeOnlyTestHost, 0);
+                                    _assertPingOutput(outputOnlyTestHost, [secondHostName], [cowboy.data.get('hostname')]);
+
+                                    // The second invokation should not have matched any hosts
+                                    assert.strictEqual(codeNoHosts, 0);
+                                    assert.strictEqual(outputNoHosts.split('\n').length, 5);
+
+                                    // The third invokation should have matched both hosts
+                                    assert.strictEqual(codeBothHosts, 0);
+                                    _assertPingOutput(outputBothHosts, [secondHostName, cowboy.data.get('hostname')], []);
+                                    return callback();
+                                });
+                            });
+                        });
+                    });
+                });
+            });
         });
     });
 });
