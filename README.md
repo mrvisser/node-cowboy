@@ -2,7 +2,7 @@
 
 **This is currently undergoing significant refactoring to facilitate a more advanced communications protocol and test harness**
 
-[![Build Status](https://travis-ci.org/mrvisser/node-cowboy.png?branch=master)](https://travis-ci.org/mrvisser/node-cowboy)
+[![Build Status](https://travis-ci.org/mrvisser/node-cowboy.png?branch=master)](https://travis-ci.org/mrvisser/node-cowboy) [![NPM version](https://badge.fury.io/js/cowboy.png)](http://badge.fury.io/js/cowboy) [![Dependency Status](https://gemnasium.com/mrvisser/node-cowboy.png)](https://gemnasium.com/mrvisser/node-cowboy)
 
 **Cowboy** is a tool inspired by MCollective that fills essentially the same need, lassoing a large cluster of servers together in order to perform execution tasks in parallel. I got sad with how difficult MCollective was to set up (mostly to install and configure ActiveMQ, Ruby stomp gem, etc...) and decided something in nodejs would be much simpler.
 
