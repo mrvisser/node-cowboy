@@ -83,29 +83,19 @@ describe('CLI', function() {
     });
 
     describe('Commands', function() {
-        
+
         describe('Ping', function() {
 
             it('outputs the proper data and format', function(callback) {
                 cowboyCli.cowboy(_defaultCowboyConfig, 'ping', function(code, output) {
                     assert.strictEqual(code, 0);
-                    output = output.split('\n');
-
-                    var latencyLine = output[1].split(' ');
-                    assert.strictEqual(_.first(latencyLine), cowboy.data.get('hostname'));
-                    assert.strictEqual(/[0-9]+ms/.test(_.last(latencyLine)), true);
-
-                    var latency = _.last(latencyLine).slice(0, -2);
-                    assert.strictEqual(output[4], util.format('Avg: %d.00ms', latency));
-                    assert.strictEqual(output[5], util.format('Min: %dms', latency));
-                    assert.strictEqual(output[6], util.format('Max: %dms', latency));
-                    assert.strictEqual(output[7], 'Tmt: 0');
-
+                    _assertPingOutput(output, [cowboy.data.get('hostname')], ['test-host']);
                     return callback();
                 });
             });
 
             it('accepts replies from multiple cattle servers', function(callback) {
+                // Start a second cattle server with custom host
                 var secondCattleConfig = _.extend({}, _defaultCattleConfig, {'data': {'hostname': 'test-host'}});
                 cowboyCli.cattle(secondCattleConfig, function(err, kill) {
                     assert.ok(!err);
@@ -113,43 +103,7 @@ describe('CLI', function() {
                     cowboyCli.cowboy(_defaultCowboyConfig, 'ping', function(code, output) {
                         kill(false, function() {
                             assert.strictEqual(code, 0);
-
-                            output = output.split('\n');
-
-                            var hasLocalHost = false;
-                            var hasTestHost = false;
-                            var min = 0;
-                            var max = 0;
-
-                            var line = output[1].split(' ');
-                            if (_.first(line) === 'test-host') {
-                                hasTestHost = true;
-                            } else if (_.first(line) === cowboy.data.get('hostname')) {
-                                hasLocalHost = true;
-                            }
-
-                            // First line should always be the smallest
-                            min = parseInt(_.last(line).slice(0, -2), 10);
-
-                            line = output[2].split(' ');
-                            if (_.first(line) === 'test-host') {
-                                hasTestHost = true;
-                            } else if (_.first(line) === cowboy.data.get('hostname')) {
-                                hasLocalHost = true;
-                            }
-
-                            // Second line is higher
-                            max = parseInt(_.last(line).slice(0, -2), 10);
-
-                            assert.ok(hasTestHost);
-                            assert.ok(hasLocalHost);
-                            assert.ok(!isNaN(min));
-                            assert.ok(!isNaN(max));
-                            assert.ok(max >= min);
-
-                            assert.strictEqual(output[6], util.format('Min: %dms', min));
-                            assert.strictEqual(output[7], util.format('Max: %dms', max));
-
+                            _assertPingOutput(output, [cowboy.data.get('hostname'), 'test-host'], []);
                             return callback();
                         });
                     });
@@ -157,4 +111,92 @@ describe('CLI', function() {
             });
         });
     });
+
+    describe('Filters', function() {
+
+        describe('Host', function() {
+
+            it('filters based on a plain string', function(callback) {
+                // Start a second cattle server with custom host
+                var secondCattleConfig = _.extend({}, _defaultCattleConfig, {'data': {'hostname': 'test-host'}});
+                cowboyCli.cattle(secondCattleConfig, function(err, kill) {
+                    assert.ok(!err);
+
+                    // Verify we only get test-host
+                    cowboyCli.cowboy(_defaultCowboyConfig, ['-H', 'test-host'], 'ping', function(code, output) {
+                        assert.strictEqual(code, 0);
+                        _assertPingOutput(output, ['test-host'], [cowboy.data.get('hostname')]);
+
+                        // Verify we get no hosts
+                        cowboyCli.cowboy(_defaultCowboyConfig, ['-H', 'test'], 'ping', function(code, output) {
+                            assert.strictEqual(code, 0);
+                            assert.strictEqual(output.split('\n').length, 5);
+
+                            // Verify we get our local host and test-host with 2 filters
+                            cowboyCli.cowboy(_defaultCowboyConfig, ['-H', 'test-host', '-H', cowboy.data.get('hostname')], 'ping', function(code, output) {
+                                assert.strictEqual(code, 0);
+                                _assertPingOutput(output, ['test-host', cowboy.data.get('hostname')], []);
+                                kill(false, function(code, signal) {
+                                    return callback();
+                                });
+                            });
+                        });
+                    });
+                });
+            });
+
+        });
+    });
 });
+
+var _assertPingOutput = function(output, expectHosts, expectNotHosts) {
+    var lines = output.split('\n');
+
+    var hostLatencies = {};
+    var endHosts = false;
+    var min = 0;
+    var max = 0;
+    _.each(lines.slice(1), function(line) {
+        if (endHosts) {
+            return;
+        } else if (line === '') {
+            endHosts = true;
+            return;
+        }
+
+        line = line.split(' ');
+        var host = _.first(line);
+        var latency = _.last(line);
+        assert.strictEqual(/[1-9][0-9]*ms/.test(latency), true);
+
+        // Convert to a strict number
+        latency = parseInt(latency.slice(0, -2), 10);
+        assert.ok(!isNaN(latency));
+        assert.ok(latency >= max);
+        assert.ok(max >= min);
+
+        // min is the first latency (it is output first), max is the last latency
+        min = min || latency;
+        max = latency;
+
+        hostLatencies[host] = latency;
+    });
+
+    // Ensure we have all the expected hosts and none of the unexpected hosts
+    _.each(expectHosts, function(expectHost) { assert.ok(hostLatencies[expectHost]); });
+    _.each(expectNotHosts, function(expectNotHost) { assert.ok(!hostLatencies[expectNotHost]); });
+
+    // Verify the latency data
+    var numHosts = _.keys(hostLatencies).length;
+
+    // Ensure the average is more than the min and less than the max
+    var outAvg = parseInt(_.last(lines[numHosts + 3].split(' ')).slice(0, -2), 10);
+    assert.ok(!isNaN(outAvg));
+    assert.ok(outAvg >= min);
+    assert.ok(outAvg <= max);
+
+    // Ensure the max and min and timeout lines are accurate
+    assert.strictEqual(lines[numHosts + 4], util.format('Min: %dms', min));
+    assert.strictEqual(lines[numHosts + 5], util.format('Max: %dms', max));
+    assert.strictEqual(lines[numHosts + 6], 'Tmt: 0');
+};
