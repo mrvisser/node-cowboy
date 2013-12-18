@@ -17,6 +17,7 @@ script:
 
 after_failure:
   - cat units.log | node_modules/.bin/bunyan
+  - cat tests/cli/cattle.log | node_modules/.bin/bunyan
 
 notifications:
   email:
