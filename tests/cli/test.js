@@ -76,13 +76,47 @@ describe('CLI', function() {
                 output = output.split('\n');
                 assert.strictEqual(output[1], 'Available Command Plugins:');
                 assert.strictEqual(output[3], '  ping');
-                assert.strictEqual(output[5], 'Use "cowboy <command> --help" to show how to use a particular command');
+                assert.strictEqual(output[4], '  test-lifecycle');
+                assert.strictEqual(output[6], 'Use "cowboy <command> --help" to show how to use a particular command');
                 return callback();
             });
         });
     });
 
     describe('Commands', function() {
+
+        describe('Lifecycle', function() {
+
+            it('stops processing on validation failure', function(callback) {
+                cowboyCli.cowboy(_defaultCowboyConfig, 'test-lifecycle', function(code, output) {
+                    assert.strictEqual(code, 1);
+
+                    var lines = output.split('\n');
+                    assert.strictEqual(lines.length, 7);
+                    assert.strictEqual(lines[0], 'validate');
+                    assert.strictEqual(lines[1], 'Error invoking command:');
+                    assert.strictEqual(lines[3], 'validation failed');
+                    assert.strictEqual(lines[5], 'Try running "cowboy test-lifecycle --help" for more information.');
+                    return callback();
+                });
+            });
+
+            it('invokes the full command lifecycle', function(callback) {
+                cowboyCli.cowboy(_defaultCowboyConfig, 'test-lifecycle', ['-v', 'validated', '-b', 'before', '-o', 'output', '-h', 'host ended', '-e', 'ended'], function(code, output) {
+                    assert.strictEqual(code, 0);
+
+                    var lines = output.split('\n');
+                    assert.strictEqual(lines.length, 7);
+                    assert.strictEqual(lines[0], 'validate');
+                    assert.strictEqual(lines[1], 'validate: validated');
+                    assert.strictEqual(lines[2], 'timeout');
+                    assert.strictEqual(lines[3], 'before: before');
+                    assert.strictEqual(lines[4], util.format('%s: exec: output (arg: host ended)', cowboy.data.get('hostname')));
+                    assert.strictEqual(lines[5], util.format('%s: exec: output (arg: ended)', cowboy.data.get('hostname')));
+                    return callback();
+                });
+            });
+        });
 
         describe('Ping', function() {
 
