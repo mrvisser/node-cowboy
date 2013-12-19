@@ -77,7 +77,8 @@ describe('CLI', function() {
                 assert.strictEqual(output[1], 'Available Command Plugins:');
                 assert.strictEqual(output[3], '  ping');
                 assert.strictEqual(output[4], '  test-lifecycle');
-                assert.strictEqual(output[6], 'Use "cowboy <command> --help" to show how to use a particular command');
+                assert.strictEqual(output[5], '  test-timeout');
+                assert.strictEqual(output[7], 'Use "cowboy <command> --help" to show how to use a particular command');
                 return callback();
             });
         });
@@ -116,6 +117,21 @@ describe('CLI', function() {
                     return callback();
                 });
             });
+
+            it('respects the timeout provided by the command', function(callback) {
+                cowboyCli.cowboy(_defaultCowboyConfig, 'test-timeout', function(code, output) {
+                    assert.strictEqual(code, 0);
+
+                    var lines = output.split('\n');
+
+                    // We had no response from the local host
+                    assert.ok(_.isEmpty(JSON.parse(lines[0])[cowboy.data.get('hostname')]));
+
+                    // The local host was in the expecting array
+                    assert.strictEqual(JSON.parse(lines[1])[0], cowboy.data.get('hostname'));
+                    return callback();
+                });
+            });
         });
 
         describe('Ping', function() {
@@ -151,6 +167,8 @@ describe('CLI', function() {
         describe('Host', function() {
 
             it('filters based on a plain string', function(callback) {
+                this.timeout(5000);
+
                 // Start a second cattle server with custom host
                 var secondHostName = 'test-host-' + Math.floor(Math.random() * 1000);
                 var secondCattleConfig = _.extend({}, _defaultCattleConfig, {'data': {'hostname': secondHostName}});
@@ -182,6 +200,8 @@ describe('CLI', function() {
             });
 
             it('filters based on a regular expression', function(callback) {
+                this.timeout(5000);
+
                 // Start a second cattle server with custom host
                 var nonce = Math.floor(Math.random() * 1000);
                 var secondHostName = 'test-host-' + nonce;

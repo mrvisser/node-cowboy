@@ -9,9 +9,10 @@ module.exports = function(grunt) {
             'test': {
                 'src': ['tests/setup.js', 'tests/*/**/*.js'],
                 'options': {
-                    'reporter': 'spec',
+                    'bail': true,
                     'grep': mocha_grep,
-                    'ignoreLeaks': true
+                    'ignoreLeaks': true,
+                    'reporter': 'spec'
                 }
             }
         }

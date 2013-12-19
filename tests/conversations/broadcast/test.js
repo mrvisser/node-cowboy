@@ -16,6 +16,7 @@ describe('Conversations', function() {
             var _response = false;
             var _responseCallback = false;
             var _endCallback = false;
+            var _endEvent = false;
 
             _setupRequestAndListener('test', 'test-request', null, function(listener, request) {
 
@@ -36,6 +37,7 @@ describe('Conversations', function() {
                             assert.ok(!err);
                             assert.ok(!_endCallback);
                             _endCallback = true;
+                            _end();
                         });
                     });
                 });
@@ -69,10 +71,19 @@ describe('Conversations', function() {
                     assert.ok(_ack);
                     assert.ok(_response);
                     assert.ok(_responseCallback);
-                    assert.ok(_endCallback);
+                    assert.ok(!_endEvent);
+                    _endEvent = true;
 
-                    return listener.close(callback);
+                    return listener.close(_end);
                 });
+
+                function _end() {
+                    // Only exit once both the _endCallback and _endEvent have been triggered
+                    // to ensure both indeed do get triggered
+                    if (_endEvent && _endCallback) {
+                        return callback();
+                    }
+                }
             });
         });
 
