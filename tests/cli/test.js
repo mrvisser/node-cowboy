@@ -1,47 +1,49 @@
 
 var _ = require('underscore');
 var assert = require('assert');
+var colors = require('colors');
 var cowboy = require('../../index');
 var cowboyCli = require('cowboy-cli-api');
+var extend = require('extend');
+var shell = require('shelljs');
 var util = require('util');
+
+var _cattleToKill = [];
+var _testModulesDir = util.format('%s/test_modules', __dirname);
+
+var _defaultCowboyConfig = {
+    'log': {
+        'level': 'trace',
+        'path': util.format('%s/cowboy.log', __dirname)
+    },
+    'modules': {
+        'dir': _testModulesDir
+    }
+};
+
+var _defaultCattleConfig = {
+    'log': {
+        'level': 'trace',
+        'path': util.format('%s/cattle.log', __dirname)
+    },
+    'modules': {
+        'dir': _testModulesDir
+    }
+};
 
 describe('CLI', function() {
 
-    var _kill = null;
-    var _testModulesDir = util.format('%s/test_modules', __dirname);
-
-    var _defaultCowboyConfig = {
-        'log': {
-            'path': util.format('%s/cowboy.log', __dirname)
-        },
-        'modules': {
-            'dir': _testModulesDir
-        }
-    };
-
-    var _defaultCattleConfig = {
-        'log': {
-            'level': 'trace',
-            'path': util.format('%s/cattle.log', __dirname)
-        },
-        'modules': {
-            'dir': _testModulesDir
-        }
-    };
-
     beforeEach(function(callback) {
-        // Prepare the cattle process
-        cowboyCli.cattle(_defaultCattleConfig, function(err, kill) {
+        // Prepare the default cattle process
+        _startCattle(_defaultCattleConfig, function(err) {
             assert.ok(!err);
-            _kill = kill;
             return callback();
         });
     });
 
     afterEach(function(callback) {
-        _kill(false, function(code, signal) {
-            return callback();
-        });
+        // Kill all kattle processes
+        return _killCattle(callback);
     });
 
     it('returns error code 1 with invalid arguments', function(callback) {
@@ -75,10 +77,11 @@ describe('CLI', function() {
                 assert.strictEqual(code, 0);
                 output = output.split('\n');
                 assert.strictEqual(output[1], 'Available Command Plugins:');
-                assert.strictEqual(output[3], '  ping');
-                assert.strictEqual(output[4], '  test-lifecycle');
-                assert.strictEqual(output[5], '  test-timeout');
-                assert.strictEqual(output[7], 'Use "cowboy <command> --help" to show how to use a particular command');
+                assert.strictEqual(output[3], '  install');
+                assert.strictEqual(output[4], '  ping');
+                assert.strictEqual(output[5], '  test-lifecycle');
+                assert.strictEqual(output[6], '  test-timeout');
+                assert.strictEqual(output[8], 'Use "cowboy <command> --help" to show how to use a particular command');
                 return callback();
             });
         });
@@ -160,6 +163,114 @@ describe('CLI', function() {
                 });
             });
         });
+
+        describe('Install', function() {
+
+            beforeEach(function(callback) {
+                // Destroy the cattle node already running, we want to restart it with a new modules dir
+                _killCattle(function() {
+                    return _createInstallCattleHosts([null, 'host_a'], callback);
+                });
+            });
+
+            afterEach(function(callback) {
+                _killCattle(function() {
+                    // Remove the host_a modules directory
+                    shell.rm('-rf', util.format('%s/node_modules', _installModulesDir('host_a')));
+                    shell.rm('-rf', util.format('%s/node_modules', _installModulesDir()));
+                    return callback();
+                });
+            });
+
+            it('installs a module on multiple cattle nodes', function(callback) {
+                this.timeout(5000);
+
+                var cowboyConfig = extend(true, _defaultCowboyConfig, {'modules': {'dir': _installModulesDir()}});
+                var from = util.format('%s/node_modules/_cowboy_lifecycle', _testModulesDir);
+
+                // Install the lifecycle plugin
+                cowboyCli.cowboy(cowboyConfig, 'install', [from], function(code, output) {
+                    assert.strictEqual(code, 0);
+
+                    var lines = output.split('\n');
+                    assert.strictEqual(lines.length, 11);
+                    assert.strictEqual(lines[1].indexOf('Installing module'), 0);
+                    assert.ok(lines[1].indexOf(from) !== -1);
+
+                    // Ensure there are 2 response lines, one for host_a and one for the local host
+                    var words6 = lines[6].split(' ');
+                    var words7 = lines[7].split(' ');
+                    var hosts = [words6[2], words7[2]];
+                    assert.ok(_.contains(hosts, 'host_a'));
+                    assert.ok(_.contains(hosts, cowboy.data.get('hostname')));
+
+                    // Ensure both response lines report the proper module and version
+                    assert.strictEqual(_.last(words6), '_cowboy_lifecycle@0.0.1');
+                    assert.strictEqual(_.last(words7), '_cowboy_lifecycle@0.0.1');
+
+                    return callback();
+                });
+            });
+
+            it('reports an unexpected error when a module fails to install', function(callback) {
+                this.timeout(15000);
+
+                var cowboyConfig = extend(true, _defaultCowboyConfig, {'modules': {'dir': _installModulesDir()}});
+                var from = 'git://invalid module path';
+
+                // Install the lifecycle plugin
+                cowboyCli.cowboy(cowboyConfig, 'install', [from], function(code, output) {
+                    assert.strictEqual(code, 0);
+
+                    var lines = output.split('\n');
+                    assert.strictEqual(lines.length, 11);
+                    assert.strictEqual(lines[1].indexOf('Installing module'), 0);
+                    assert.ok(lines[1].indexOf(from) !== -1);
+
+                    // Ensure there are 2 response lines, one for host_a and one for the local host
+                    var words6 = lines[6].split(' ');
+                    var words7 = lines[7].split(' ');
+                    var hosts = [words6[2], words7[2]];
+                    assert.ok(_.contains(hosts, 'host_a'));
+                    assert.ok(_.contains(hosts, cowboy.data.get('hostname')));
+
+                    // Ensure both response lines report the proper module and version
+                    assert.strictEqual(words6.slice(-4).join(' '), 'An unexpected error occurred'.red);
+                    assert.strictEqual(words7.slice(-4).join(' '), 'An unexpected error occurred'.red);
+
+                    return callback();
+                });
+            });
+
+            it('reports an invalid module when an invalid cowboy plugin installs successfully', function(callback) {
+                this.timeout(5000);
+                var cowboyConfig = extend(true, _defaultCowboyConfig, {'modules': {'dir': _installModulesDir()}});
+                var from = util.format('%s/node_modules/_cowboy_invalid_module', _testModulesDir);
+
+                // Install the lifecycle plugin
+                cowboyCli.cowboy(cowboyConfig, 'install', [from], function(code, output) {
+                    assert.strictEqual(code, 0);
+
+                    var lines = output.split('\n');
+                    assert.strictEqual(lines.length, 11);
+                    assert.strictEqual(lines[1].indexOf('Installing module'), 0);
+                    assert.ok(lines[1].indexOf(from) !== -1);
+
+                    // Ensure there are 2 response lines, one for host_a and one for the local host
+                    var words6 = lines[6].split(' ');
+                    var words7 = lines[7].split(' ');
+                    var hosts = [words6[2], words7[2]];
+                    assert.ok(_.contains(hosts, 'host_a'));
+                    assert.ok(_.contains(hosts, cowboy.data.get('hostname')));
+
+                    // Ensure both response lines report the proper module and version
+                    assert.strictEqual(words6.slice(-8).join(' '), 'Installed module is not a cowboy plugin module'.red);
+                    assert.strictEqual(words7.slice(-8).join(' '), 'Installed module is not a cowboy plugin module'.red);
+
+                    return callback();
+                });
+            });
+        });
     });
 
     describe('Filters', function() {
@@ -236,6 +347,68 @@ describe('CLI', function() {
         });
     });
 });
+
+var _startCattle = function(configs, callback) {
+    if (!_.isArray(configs)) {
+        return _startCattle([configs], callback);
+    }
+
+    var numToStart = configs.length;
+    var _err = null;
+    _.each(configs, function(config) {
+        cowboyCli.cattle(config, function(err, kill) {
+            if (err) {
+                _err = err;
+            }
+
+            _cattleToKill.push(kill);
+            numToStart--;
+            if (numToStart === 0) {
+                return callback(_err);
+            }
+        });
+    });
+};
+
+var _killCattle = function(callback) {
+    var numToKill = _cattleToKill.length;
+    if (numToKill === 0) {
+        return callback();
+    }
+
+    _.each(_cattleToKill, function(kill) {
+        kill(false, function() {
+            numToKill--;
+            if (numToKill === 0) {
+                _cattleToKill = [];
+                return callback();
+            }
+        });
+    });
+};
+
+var _createInstallCattleHosts = function(hosts, callback) {
+    var configs = _.map(hosts, function(host) {
+        return extend(true, {}, _defaultCattleConfig, {
+            'data': {
+                'hostname': host || cowboy.data.get('hostname')
+            },
+            'modules': {
+                'dir': _installModulesDir(host)
+            }
+        });
+    });
+
+    return _startCattle(configs, callback);
+};
+
+var _installModulesDir = function(host) {
+    if (host) {
+        return util.format('%s/._cowboy_test_install/%s', __dirname, host);
+    } else {
+        return util.format('%s/._cowboy_test_install', __dirname);
+    }
+};
 
 var _assertPingOutput = function(output, expectHosts, expectNotHosts) {
     var lines = output.split('\n');
