@@ -11,7 +11,7 @@ var _installModulesDir = util.format('%s/._cowboy_test_install', __dirname);
 var _testModulesDir = util.format('%s/test_modules', __dirname);
 var _testModuleLoadingOrderDir = util.format('%s/test_module_loading_order', __dirname);
 
-var EXPECTED_CORE_COMMANDS = ['install', 'ping'];
+var EXPECTED_CORE_COMMANDS = ['install', 'ping', 'uninstall'];
 
 describe('Plugins', function() {
 

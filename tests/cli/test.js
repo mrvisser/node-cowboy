@@ -80,8 +80,10 @@ describe('CLI', function() {
                 assert.strictEqual(output[3], '  install');
                 assert.strictEqual(output[4], '  ping');
                 assert.strictEqual(output[5], '  test-lifecycle');
-                assert.strictEqual(output[6], '  test-timeout');
-                assert.strictEqual(output[8], 'Use "cowboy <command> --help" to show how to use a particular command');
+                assert.strictEqual(output[6], '  test-ping');
+                assert.strictEqual(output[7], '  test-timeout');
+                assert.strictEqual(output[8], '  uninstall');
+                assert.strictEqual(output[10], 'Use "cowboy <command> --help" to show how to use a particular command');
                 return callback();
             });
         });
@@ -208,7 +210,16 @@ describe('CLI', function() {
                     assert.strictEqual(_.last(words6), '_cowboy_lifecycle@0.0.1');
                     assert.strictEqual(_.last(words7), '_cowboy_lifecycle@0.0.1');
 
-                    return callback();
+                    // Ensure the test-ping command is installed
+                    cowboyCli.cowboy(cowboyConfig, 'test-ping', function(code, output) {
+                        assert.strictEqual(code, 0);
+                        
+                        output = JSON.parse(output);
+                        assert.strictEqual(output.host_a[0], 'responded');
+                        assert.strictEqual(output[cowboy.data.get('hostname')][0], 'responded');
+
+                        return callback();
+                    });
                 });
             });
 
@@ -267,6 +278,70 @@ describe('CLI', function() {
                     assert.strictEqual(words6.slice(-8).join(' '), 'Installed module is not a cowboy plugin module'.red);
                     assert.strictEqual(words7.slice(-8).join(' '), 'Installed module is not a cowboy plugin module'.red);
 
+                    return callback();
+                });
+            });
+        });
+
+        describe('Uninstall', function() {
+
+            beforeEach(function(callback) {
+                // Destroy the cattle node already running, we want to restart it with a new modules dir
+                _killCattle(function() {
+                    return _createInstallCattleHosts([null, 'host_a'], callback);
+                });
+            });
+
+            afterEach(function(callback) {
+                _killCattle(function() {
+                    // Remove the host_a modules directory
+                    shell.rm('-rf', util.format('%s/node_modules', _installModulesDir('host_a')));
+                    shell.rm('-rf', util.format('%s/node_modules', _installModulesDir()));
+                    return callback();
+                });
+            });
+
+            it('uninstalls a module on multiple cattle nodes', function(callback) {
+                this.timeout(5000);
+
+                var cowboyConfig = extend(true, _defaultCowboyConfig, {'modules': {'dir': _installModulesDir()}});
+                var from = util.format('%s/node_modules/_cowboy_lifecycle', _testModulesDir);
+
+                // Install the lifecycle plugin
+                cowboyCli.cowboy(cowboyConfig, 'install', [from], function(code, output) {
+                    assert.strictEqual(code, 0);
+
+                    // Sanity check that the command is in the command list
+                    cowboyCli.cowboy(cowboyConfig, ['--list'], function(code, output) {
+                        assert.strictEqual(code, 0);
+                        assert.notEqual(output.indexOf('test-ping'), -1);
+
+                        // Uninstall the module and ensure the test-ping command is no longer available
+                        cowboyCli.cowboy(cowboyConfig, 'uninstall', ['_cowboy_lifecycle'], function(code, output) {
+                            assert.strictEqual(code, 0);
+                            assert.strictEqual(output.indexOf('test-ping'), -1);
+                            return callback();
+                        });
+                    });
+                });
+            });
+
+            it('reports an error when uninstalling an non-existent module', function(callback) {
+                this.timeout(5000);
+
+                var cowboyConfig = extend(true, _defaultCowboyConfig, {'modules': {'dir': _installModulesDir()}});
+                var from = util.format('%s/node_modules/_cowboy_lifecycle', _testModulesDir);
+
+                // Uninstall the module and ensure the test-ping command is no longer available
+                cowboyCli.cowboy(cowboyConfig, 'uninstall', ['_cowboy_module_does_not_exist'], function(code, output) {
+                    assert.strictEqual(code, 0);
+
+                    var lines = output.split('\n');
+                    var words6 = lines[6].split(' ');
+                    var words7 = lines[7].split(' ');
+
+                    assert.strictEqual(words6.slice(-7).join(' '), 'Tried to get a non-existing module: "_cowboy_module_does_not_exist"'.red);
+                    assert.strictEqual(words7.slice(-7).join(' '), 'Tried to get a non-existing module: "_cowboy_module_does_not_exist"'.red);
                     return callback();
                 });
             });
