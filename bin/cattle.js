@@ -42,7 +42,9 @@ cowboy.context.init(argv, function(err) {
         cowboy.presence.broadcast();
 
         commandListener.on('request', function(body, reply, end) {
-            var Command = cowboy.plugins.command(body.commandName);
+
+            var commandExec = cowboy.util.parseInputCommand(body.commandName);
+            var Command = cowboy.plugins.command(commandExec.commandName, commandExec.moduleName);
             if (!Command) {
                 cowboy.logger.system().debug({'body': body}, 'Rejecting unknown command');
                 reply('reject');

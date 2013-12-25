@@ -63,7 +63,7 @@ describe('CLI', function() {
         });
 
         it('returns command help info when a command is run with --help', function(callback) {
-            cowboyCli.cowboy(_defaultCowboyConfig, ['--help'], 'ping', function(code, output) {
+            cowboyCli.cowboy(_defaultCowboyConfig, ['--help'], 'cowboy:ping', function(code, output) {
                 assert.strictEqual(code, 0);
                 assert.strictEqual(output.indexOf('\nSend a simple ping to cattle nodes to determine if they are active and listening.'), 0);
                 return callback();
@@ -77,13 +77,15 @@ describe('CLI', function() {
                 assert.strictEqual(code, 0);
                 output = output.split('\n');
                 assert.strictEqual(output[1], 'Available Command Plugins:');
-                assert.strictEqual(output[3], '  install');
-                assert.strictEqual(output[4], '  ping');
-                assert.strictEqual(output[5], '  test-lifecycle');
-                assert.strictEqual(output[6], '  test-ping');
-                assert.strictEqual(output[7], '  test-timeout');
-                assert.strictEqual(output[8], '  uninstall');
-                assert.strictEqual(output[10], 'Use "cowboy <command> --help" to show how to use a particular command');
+                assert.strictEqual(output[3], '  _cowboy_duplicate_command:ping');
+                assert.strictEqual(output[4], '  _cowboy_lifecycle:test-lifecycle');
+                assert.strictEqual(output[5], '  _cowboy_lifecycle:test-ping');
+                assert.strictEqual(output[6], '  _cowboy_lifecycle:test-timeout');
+                assert.strictEqual(output[7], '  cowboy:describe');
+                assert.strictEqual(output[8], '  cowboy:install');
+                assert.strictEqual(output[9], '  cowboy:ping');
+                assert.strictEqual(output[10], '  cowboy:uninstall');
+                assert.strictEqual(output[12], 'Use "cowboy <command> --help" to show how to use a particular command');
                 return callback();
             });
         });
@@ -137,12 +139,28 @@ describe('CLI', function() {
                     return callback();
                 });
             });
+
+            it('chooses the correct command when namespaced by module', function(callback) {
+                cowboyCli.cowboy(_defaultCowboyConfig, '_cowboy_duplicate_command:ping', function(code, output) {
+                    assert.strictEqual(code, 0);
+                    assert.strictEqual(output, 'pang\n');
+                    return callback();
+                });
+            });
+
+            it('throws an error when chosen command is ambiguous', function(callback) {
+                cowboyCli.cowboy(_defaultCowboyConfig, 'ping', function(code, output) {
+                    assert.strictEqual(code, 1);
+                    assert.notEqual(output.indexOf('Command "ping" is ambiguous. Use the module namespace to more specifically identify the command (e.g., cowboy:ping)'), -1);
+                    return callback();
+                });
+            });
         });
 
         describe('Ping', function() {
 
             it('outputs the proper data and format', function(callback) {
-                cowboyCli.cowboy(_defaultCowboyConfig, 'ping', function(code, output) {
+                cowboyCli.cowboy(_defaultCowboyConfig, 'cowboy:ping', function(code, output) {
                     assert.strictEqual(code, 0);
                     _assertPingOutput(output, [cowboy.data.get('hostname')], ['test-host']);
                     return callback();
@@ -155,7 +173,7 @@ describe('CLI', function() {
                 cowboyCli.cattle(secondCattleConfig, function(err, kill) {
                     assert.ok(!err);
 
-                    cowboyCli.cowboy(_defaultCowboyConfig, 'ping', function(code, output) {
+                    cowboyCli.cowboy(_defaultCowboyConfig, 'cowboy:ping', function(code, output) {
                         kill(false, function() {
                             assert.strictEqual(code, 0);
                             _assertPingOutput(output, [cowboy.data.get('hostname'), 'test-host'], []);
@@ -361,9 +379,9 @@ describe('CLI', function() {
                 cowboyCli.cattle(secondCattleConfig, function(err, kill) {
                     assert.ok(!err);
 
-                    cowboyCli.cowboy(_defaultCowboyConfig, ['-H', secondHostName], 'ping', function(codeOnlyTestHost, outputOnlyTestHost) {
-                        cowboyCli.cowboy(_defaultCowboyConfig, ['-H', 'test'], 'ping', function(codeNoHosts, outputNoHosts) {
-                            cowboyCli.cowboy(_defaultCowboyConfig, ['-H', secondHostName, '-H', cowboy.data.get('hostname')], 'ping', function(codeBothHosts, outputBothHosts) {
+                    cowboyCli.cowboy(_defaultCowboyConfig, ['-H', secondHostName], 'cowboy:ping', function(codeOnlyTestHost, outputOnlyTestHost) {
+                        cowboyCli.cowboy(_defaultCowboyConfig, ['-H', 'test'], 'cowboy:ping', function(codeNoHosts, outputNoHosts) {
+                            cowboyCli.cowboy(_defaultCowboyConfig, ['-H', secondHostName, '-H', cowboy.data.get('hostname')], 'cowboy:ping', function(codeBothHosts, outputBothHosts) {
                                 kill(false, function(code, signal) {
 
                                     // The first invokation should have only the test host
@@ -396,9 +414,9 @@ describe('CLI', function() {
                     assert.ok(!err);
 
                     // Verify we only get test-host
-                    cowboyCli.cowboy(_defaultCowboyConfig, ['-H', util.format('/^.*%d$/', nonce)], 'ping', function(codeOnlyTestHost, outputOnlyTestHost) {
-                        cowboyCli.cowboy(_defaultCowboyConfig, ['-H', util.format('/^%d/', nonce)], 'ping', function(codeNoHosts, outputNoHosts) {
-                            cowboyCli.cowboy(_defaultCowboyConfig, ['-H', util.format('/^%s$/', secondHostName), '-H', util.format('/^%s$/', cowboy.data.get('hostname'))], 'ping', function(codeBothHosts, outputBothHosts) {
+                    cowboyCli.cowboy(_defaultCowboyConfig, ['-H', util.format('/^.*%d$/', nonce)], 'cowboy:ping', function(codeOnlyTestHost, outputOnlyTestHost) {
+                        cowboyCli.cowboy(_defaultCowboyConfig, ['-H', util.format('/^%d/', nonce)], 'cowboy:ping', function(codeNoHosts, outputNoHosts) {
+                            cowboyCli.cowboy(_defaultCowboyConfig, ['-H', util.format('/^%s$/', secondHostName), '-H', util.format('/^%s$/', cowboy.data.get('hostname'))], 'cowboy:ping', function(codeBothHosts, outputBothHosts) {
                                 kill(false, function(code, signal) {
 
                                     // The first invokation should have only the test host
