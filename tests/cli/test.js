@@ -374,29 +374,31 @@ describe('CLI', function() {
                 });
             });
 
+            afterEach(function(callback) {
+                _killCattle(function() {
+                    // Remove the host_a modules directory
+                    shell.rm('-rf', util.format('%s/node_modules', _installModulesDir('host_a')));
+                    shell.rm('-rf', util.format('%s/node_modules', _installModulesDir()));
+                    return callback();
+                });
+            });
+
             it('describes the cowboy module', function(callback) {
                 this.timeout(5000);
 
                 var cowboyConfig = extend(true, _defaultCowboyConfig, {'modules': {'dir': _installModulesDir()}});
                 cowboyCli.cowboy(cowboyConfig, 'describe', function(code, output) {
-                    console.log(output);
                     assert.strictEqual(code, 0);
-                    
-                    var lines = output.split('\n');
-                    assert.strictEqual(lines.length, 8);
-
-                    var words3 = lines[3].split(' ');
-                    var words5 = lines[5].split(' ');
 
                     // Ensure both hosts were output
-                    var outputHosts = [words3[2], words5[2]];
+                    var outputHosts = [_getCell(output, 3, 0), _getCell(output, 5, 0)];
                     assert.strictEqual(_.difference(outputHosts, [cowboy.data.get('hostname'), 'host_a']).length, 0);
 
                     // Ensure both lines contain the module name and commands
-                    assert.strictEqual(lines[3].slice(30, 37), 'cowboy@');
-                    assert.strictEqual(lines[3].slice(58).indexOf('describe, install, ping, uninstall'), 0);
-                    assert.strictEqual(lines[5].slice(30, 37), 'cowboy@');
-                    assert.strictEqual(lines[5].slice(58).indexOf('describe, install, ping, uninstall'), 0);
+                    assert.strictEqual(_getCell(output, 3, 1).slice(0, 7), 'cowboy@');
+                    assert.strictEqual(_getCell(output, 3, 2), 'describe, install, ping, uninstall');
+                    assert.strictEqual(_getCell(output, 5, 1).slice(0, 7), 'cowboy@');
+                    assert.strictEqual(_getCell(output, 5, 2), 'describe, install, ping, uninstall');
 
                     return callback();
                 });
@@ -415,35 +417,28 @@ describe('CLI', function() {
                     cowboyCli.cowboy(cowboyConfig, 'describe', function(code, output) {
                         assert.strictEqual(code, 0);
 
-                        var lines = output.split('\n');
-                        assert.strictEqual(lines.length, 10);
-
-                        var words3 = lines[3].split(' ');
-                        var words4 = lines[4].split(' ');
-                        var words6 = lines[6].split(' ');
-                        var words7 = lines[7].split(' ');
-                        var outputHosts = [words3[2], words6[2]];
+                        var outputHosts = [_getCell(output, 3, 0), _getCell(output, 6, 0)];
                         assert.strictEqual(_.difference(outputHosts, [cowboy.data.get('hostname'), 'host_a']).length, 0);
 
                         // The lines following the host should be an empty cell as we only show each host once
-                        assert.strictEqual(words4[2], '');
-                        assert.strictEqual(words7[2], '');
+                        assert.strictEqual(_getCell(output, 4, 0), '');
+                        assert.strictEqual(_getCell(output, 7, 0), '');
 
                         // Ensure the first host first line contains the lifecycle module and its commands
-                        assert.strictEqual(lines[3].slice(30, 53), '_cowboy_lifecycle@0.0.1');
-                        assert.strictEqual(lines[3].slice(58).indexOf('test-lifecycle, test-ping, test-timeout'), 0);
+                        assert.strictEqual(_getCell(output, 3, 1), '_cowboy_lifecycle@0.0.1');
+                        assert.strictEqual(_getCell(output, 3, 2), 'test-lifecycle, test-ping, test-timeout');
 
                         // Ensure the first host second line contains the cowboy module and its commands
-                        assert.strictEqual(lines[4].slice(30, 37), 'cowboy@');
-                        assert.strictEqual(lines[4].slice(58).indexOf('describe, install, ping, uninstall'), 0);
+                        assert.strictEqual(_getCell(output, 4, 1).slice(0, 7), 'cowboy@');
+                        assert.strictEqual(_getCell(output, 4, 2), 'describe, install, ping, uninstall');
 
                         // Ensure the second host first line contains the lifecycle module and its commands
-                        assert.strictEqual(lines[6].slice(30, 53), '_cowboy_lifecycle@0.0.1');
-                        assert.strictEqual(lines[6].slice(58).indexOf('test-lifecycle, test-ping, test-timeout'), 0);
+                        assert.strictEqual(_getCell(output, 6, 1), '_cowboy_lifecycle@0.0.1');
+                        assert.strictEqual(_getCell(output, 6, 2), 'test-lifecycle, test-ping, test-timeout');
 
                         // Ensure the second host second line contains the cowboy module and its commands
-                        assert.strictEqual(lines[7].slice(30, 37), 'cowboy@');
-                        assert.strictEqual(lines[7].slice(58).indexOf('describe, install, ping, uninstall'), 0);
+                        assert.strictEqual(_getCell(output, 7, 1).slice(0, 7), 'cowboy@');
+                        assert.strictEqual(_getCell(output, 7, 2), 'describe, install, ping, uninstall');
 
                         return callback();
                     });
@@ -526,6 +521,11 @@ describe('CLI', function() {
         });
     });
 });
+
+var _getCell = function(output, row, col) {
+    var lines = output.split('\n');
+    return lines[row].split('|')[col].trim();
+};
 
 var _startCattle = function(configs, callback) {
     if (!_.isArray(configs)) {

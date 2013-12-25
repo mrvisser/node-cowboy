@@ -9,7 +9,6 @@ module.exports = function(grunt) {
             'test': {
                 'src': ['tests/setup.js', 'tests/*/**/*.js'],
                 'options': {
-                    'bail': true,
                     'grep': mocha_grep,
                     'ignoreLeaks': true,
                     'reporter': 'spec'
