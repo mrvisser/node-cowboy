@@ -379,6 +379,7 @@ describe('CLI', function() {
 
                 var cowboyConfig = extend(true, _defaultCowboyConfig, {'modules': {'dir': _installModulesDir()}});
                 cowboyCli.cowboy(cowboyConfig, 'describe', function(code, output) {
+                    console.log(output);
                     assert.strictEqual(code, 0);
                     
                     var lines = output.split('\n');
