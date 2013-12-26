@@ -47,6 +47,9 @@ Command.prototype.exec = function(ctx, reply, done) {
     });
 };
 
+/**
+ * @see ../command.js
+ */
 Command.prototype.end = function(ctx, responses, expired, done) {
     var hosts = _.keys(responses);
     hosts.sort();
@@ -64,6 +67,9 @@ Command.prototype.end = function(ctx, responses, expired, done) {
     return done();
 };
 
+/*!
+ * Print module and plugin information for one host
+ */
 var _printHost = function(host, modules) {
     var hostPrinted = false;
     var commandLineLength = 50;
@@ -106,14 +112,23 @@ var _printHost = function(host, modules) {
     
 };
 
+/*!
+ * Print one row in the describe table
+ */
 var _printRow = function(host, module, commands) {
     console.log(sprintf('  %-25s | %-25s | %-50s ', host, module, commands));
 };
 
+/*!
+ * Print an error line in the describe table
+ */
 var _printError = function(host, message) {
     console.log(sprintf('  %-25s | %-78s ', host, message.red));
 };
 
+/*!
+ * Print a line separator in the describe table
+ */
 var _printSeparator = function() {
     console.log('----------------------------|---------------------------|----------------------------------------------------');
 };
