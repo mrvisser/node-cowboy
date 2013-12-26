@@ -1,104 +1,66 @@
 ## Cowboy
 
-**This is currently undergoing significant refactoring to facilitate a more advanced communications protocol and test harness**
-
 [![Build Status](https://travis-ci.org/mrvisser/node-cowboy.png?branch=master)](https://travis-ci.org/mrvisser/node-cowboy) [![NPM version](https://badge.fury.io/js/cowboy.png)](http://badge.fury.io/js/cowboy) [![Dependency Status](https://gemnasium.com/mrvisser/node-cowboy.png)](https://gemnasium.com/mrvisser/node-cowboy)
 
-**Cowboy** is a tool inspired by MCollective that fills essentially the same need, lassoing a large cluster of servers together in order to perform execution tasks in parallel. I got sad with how difficult MCollective was to set up (mostly to install and configure ActiveMQ, Ruby stomp gem, etc...) and decided something in nodejs would be much simpler.
+**Cowboy** is a light-weight, easy-to-install tool that lassoes a large number of servers together in order to perform execution tasks or gather diagnostic information from nodes in parallel. At its core, Cowboy simply facilitates a framework and infrastructure that allows plugins to be implemented that do useful things. Out of the box, cowboy comes with a simple set of plugins:
+
+* `ping` - Interrogates the network for cattle nodes that are listening for commands
+* `install` - Installs a new cowboy module on all listening cattle nodes
+* `uninstall` - Uninstalls an installed cowboy module on all listening cattle nodes
+* `describe` - Describes the modules and commands available to all listening cattle nodes
+
+At this moment these core commands the only ones that exist, however more useful plugins will be in development and indexed here.
 
 ## Simple Usage
 
 First [download and install Redis](http://redis.io/download), make sure it's listening on port 6379. Then install and run cowboy:
 
 ```bash
-~/Source/cowboy$ npm -g install forever
-
-# It will be on NPM when it hits a functional milestone
 ~/Source/cowboy$ npm -g install cowboy
 
-# Start the cattle server
-~/Source/cowboy$ npm -g start cowboy
+# Start the cattle server, which listens for commands from the cowboyt node
+~/Source/cowboy$ cattle &
 
 # Send a ping command to all the remote cattle servers
 ~/Source/cowboy$ cowboy ping
-[04:08:33.619Z]  INFO branden-macbook.local: pong
-[04:08:38.617Z]  INFO system: Complete
+Host                      Latency
+branden-macbook.local     13ms
 
-# Install express on all the remote cattle servers
-~/Source/cowboy$ cowboy npm-install express
-[04:08:50.726Z]  INFO branden-macbook.local: Installed version 3.3.4 of module express
-[04:08:52.439Z]  INFO system: Complete
+Ping Statistics:
+Avg: 13.00ms
+Min: 13ms
+Max: 13ms
+Tmt: 0
+
+~/Source/cowboy$ cowboy describe
+ 
+  Host                      | Module                    | Commands                                           
+----------------------------|---------------------------|----------------------------------------------------
+  branden-macbook.local     | cowboy@0.0.2              | describe, install, ping, uninstall                 
+----------------------------|---------------------------|----------------------------------------------------
 ```
 
 ## How it works
 
-Cowboy uses a client module called, well, the "cowboy" and each server in your cluster runs a "cattle" server. The cowboy broadcasts messages to the cattle using Redis PubSub and the cattle responds with another PubSub message back to the cowboy.
+Cowboy uses a client module called, well, the "cowboy" and each server in your cluster should run a "cattle" server. The cowboy broadcasts messages to the cattle using Redis PubSub and the cattle responds with another PubSub message back to the cowboy.
 
-## Example
+### Walk-through
+
+Take for instance the simple `cowboy ping` command:
 
 ```
 ~/Source/cowboy$ cowboy ping
-[01:26:13.709Z]  INFO branden-macbook.local: pong
-[01:26:18.705Z]  INFO system: Complete
+Host                      Latency
+branden-macbook.local     13ms
+
+Ping Statistics:
+Avg: 13.00ms
+Min: 13ms
+Max: 13ms
+Tmt: 0
 ```
 
-This is a trivial "ping" module. When you execute `cowboy ping` from the cowboy, all nodes listening on the pubsub channel will reply back with "pong". The plugin is in charge of receiving the request and performing the operations on the remote server and sending a response to the cowboy. It is also responsible for formatting that response on the cowboy client.
-
-## Plugins
-
-The plugin system is managed by NPM. Meaning, you can install new plugins simply by running `npm install <plugin> -g`. When the cowboy and cattle servers start up, they do a scan of all modules available in the global NPM directory and look for `cowboy.json` in the root. If an NPM module has a `cowboy.json` it is considered to be a plugin.
-
-Currently the only plugin is a `ping` plugin which is contained in the cowboy module itself. The anatomy this most simply plugin is:
-
-**/cowboy.json:** This simply tells cowboy where the plugins directory for this module is (relative to the root of the module).
-
-```json
-{
-    "plugins": "plugins"
-}
-```
-
-**/plugins:** This directory contains all the plugin types as directories. The only type of plugin at the moment is a `lasso` plugin, which is a plugin that will receive a command from the cowboy on the cattle, and then format the response on the cowboy. More later.
-
-**/plugins/lassos:** This directory contains all the lasso plugins as javascript files. Each file should be `<command name>.js`, where the command name is the first argument to `cowboy` (e.g., `cowboy ping` - ping is the command). Notice the file `lib/plugins/lassos/ping.js` which controls the ping command.
-
-**/plugins/lassos/ping.js:** The file that implements the lasso command. It will contain 2 methods:
-
-```javascript
-/**
- * Return an object that describes the help information for the plugin. The object
- * has fields:
- *
- *  * description   : A String description of what the plugin does. Can be multiple lines.
- *  * args          : A single line of text showing the args. E.g., "<required option> [<optional option>] [-v] [-d <directory>]"
- *  * examples      : A list of strings showing ways to use the module
- *
- *  {
- *      "description": "Uses npm -g to globally install a module on the cattle nodes.",
- *      "args": "<npm module>",
- *      "exampleArgs": ["express", "express@3.3.4", "git://github.com/visionmedia/express"]
- *  }
- *
- * @return  {Object}    An object describing
- */
-var help = module.exports.help = function() {
-    return {'description': 'Send a simple ping to cattle nodes to determine if they are active and listening.'};
-};
-
-/**
- * Handle a request from the cowboy. This will be invoked on the cattle node.
- *
- * @param  {String[]}   args        The arguments that the command was invoked with
- * @param  {Function}   done        Invoke this when you are finished handling the request
- * @param  {Number}     done.code   A numeric code indicating the exit status. 0 should indicate success, anything above 0 should indicate some plugin-specific error code.
- * @param  {Object}     done.reply  The reply that goes along with the code. Can be any arbitrary String or Object
- */
-var handle = module.exports.exec = function(args, done) {
-    return done(0, 'pong');
-};
-```
-
-For a more in-depth example, have a look at the [npm-install plugin](https://github.com/mrvisser/node-cowboy/blob/master/plugins/lassos/npm-install.js)
+When you execute `cowboy ping` from the cowboy, the cowboy client will issue a pubsub message on a command channel. All cattle nodes listening on the pubsub channel will receive the message, execute the `ping` command's `exec` method, who replies with a "pong" string. The plugin is in charge of receiving the request and performing the operations on the remote server and sending a response to the cowboy. It is also responsible for formatting that response on the cowboy client.
 
 ## License
 
