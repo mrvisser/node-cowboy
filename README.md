@@ -42,7 +42,7 @@ Max: 13ms
 Tmt: 0
 ```
 
-It's just that easy.
+It's just that easy. Have a look at the [Wiki](https://github.com/mrvisser/node-cowboy/wiki) for more advanced details.
 
 ## License
 
