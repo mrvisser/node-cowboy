@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html>
+
+  <head>
+    <meta charset='utf-8' />
+    <meta http-equiv="X-UA-Compatible" content="chrome=1" />
+    <meta name="description" content="Cowboy : A pluggable parallel execution tool implemented with Node.js and Redis" />
+
+    <link rel="stylesheet" type="text/css" media="screen" href="stylesheets/stylesheet.css">
+
+    <title>Cowboy</title>
+  </head>
+
+  <body>
+
+    <!-- HEADER -->
+    <div id="header_wrap" class="outer">
+        <header class="inner">
+          <a id="forkme_banner" href="https://github.com/mrvisser/node-cowboy">View on GitHub</a>
+
+          <h1 id="project_title">Cowboy</h1>
+          <h2 id="project_tagline">A pluggable parallel execution tool implemented with Node.js and Redis</h2>
+
+            <section id="downloads">
+              <a class="zip_download_link" href="https://github.com/mrvisser/node-cowboy/zipball/master">Download this project as a .zip file</a>
+              <a class="tar_download_link" href="https://github.com/mrvisser/node-cowboy/tarball/master">Download this project as a tar.gz file</a>
+            </section>
+        </header>
+    </div>
+
+    <!-- MAIN CONTENT -->
+    <div id="main_content_wrap" class="outer">
+      <section id="main_content" class="inner">
+        <p><strong>Cowboy</strong> is a light-weight, easy-to-install tool that lassoes a large number of servers together in order to perform execution tasks or gather diagnostic information from nodes in parallel. At its core, Cowboy simply facilitates a framework and infrastructure that allows plugins to be implemented that do useful things. We have a few helpful core plugins to get you started:</p>
+
+<ul>
+<li>
+<code>describe</code> - Describes the modules and commands available to all listening cattle nodes</li>
+<li>
+<code>install</code> - Installs a new cowboy module on all listening cattle nodes</li>
+<li>
+<code>ping</code> - Interrogates the network for cattle nodes that are listening for commands</li>
+<li>
+<code>uninstall</code> - Uninstalls an installed cowboy module on all listening cattle nodes</li>
+</ul><p>And the rest is up to you!</p>
+
+<h2>
+<a name="installation" class="anchor" href="#installation"><span class="octicon octicon-link"></span></a>Installation</h2>
+
+<p>First <a href="http://redis.io/download">download and install Redis</a>, make sure it's listening on port 6379.</p>
+
+<p>Then install the cowboy module:</p>
+
+<p><code>npm -g install cowboy</code></p>
+
+<p>Since Cowboy uses <a href="https://github.com/trentm/bunyan">Bunyan</a> for logging, it's best to install globally as well for piping log output:</p>
+
+<p><code>npm -g install bunyan</code></p>
+
+<h2>
+<a name="usage" class="anchor" href="#usage"><span class="octicon octicon-link"></span></a>Usage</h2>
+
+<p>Cowboy is made up of 2 components:</p>
+
+<p><strong>Cattle:</strong> The cattle binary listens to commands issued from the cowboy command VIA Redis. There must be a cattle process running on each server node that you control with Cowboy. This can be started by simply running: <code>cattle | bunyan</code>. For use in production, you will want to use something like <a href="https://github.com/nodejitsu/forever">Forever</a> or Upstart to run it as a daemon process.</p>
+
+<p><strong>Cowboy:</strong> The cowboy module is the command-line client where commands can be executed. To see options, type: <code>cowboy --help</code></p>
+
+<h2>
+<a name="license" class="anchor" href="#license"><span class="octicon octicon-link"></span></a>License</h2>
+
+<p>Copyright (c) 2013 Branden Visser</p>
+
+<p>Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:</p>
+
+<p>The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.</p>
+
+<p>THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.</p>
+      </section>
+    </div>
+
+    <!-- FOOTER  -->
+    <div id="footer_wrap" class="outer">
+      <footer class="inner">
+        <p class="copyright">Cowboy maintained by <a href="https://github.com/mrvisser">mrvisser</a></p>
+        <p>Published with <a href="http://pages.github.com">GitHub Pages</a></p>
+      </footer>
+    </div>
+
+    
+
+  </body>
+</html>
