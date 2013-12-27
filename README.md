@@ -2,52 +2,36 @@
 
 [![Build Status](https://travis-ci.org/mrvisser/node-cowboy.png?branch=master)](https://travis-ci.org/mrvisser/node-cowboy) [![NPM version](https://badge.fury.io/js/cowboy.png)](http://badge.fury.io/js/cowboy)
 
-**Cowboy** is a light-weight, easy-to-install tool that lassoes a large number of servers together in order to perform execution tasks or gather diagnostic information from nodes in parallel. At its core, Cowboy simply facilitates a framework and infrastructure that allows plugins to be implemented that do useful things. Out of the box, cowboy comes with a simple set of plugins:
+**Cowboy** is a light-weight, easy-to-install tool that lassoes a large number of servers together in order to perform execution tasks or gather diagnostic information from nodes in parallel. At its core, Cowboy simply facilitates a framework and infrastructure that allows plugins to be implemented that do useful things. We give you these commands to get you started:
 
 * `describe` - Describes the modules and commands available to all listening cattle nodes
 * `install` - Installs a new cowboy module on all listening cattle nodes
 * `ping` - Interrogates the network for cattle nodes that are listening for commands
 * `uninstall` - Uninstalls an installed cowboy module on all listening cattle nodes
 
+## Installation
+
+First [download and install Redis](http://redis.io/download), make sure it's listening on port 6379.
+
+Install [Bunyan](https://github.com/trentm/bunyan) and Cowboy:
+
+`npm install -g bunyan cowboy`
+
 ## Simple Usage
 
-First [download and install Redis](http://redis.io/download), make sure it's listening on port 6379. Then install and run cowboy:
+Cowboy is made up of 2 components, the cattle server and the cowboy client. The Cattle server listens and executes commands when run from the cowboy client.
 
-```bash
-~/Source/cowboy$ npm -g install cowboy
+First start up the Cattle server:
 
-# Start the cattle server, which listens for commands from the cowboyt node
-~/Source/cowboy$ cattle &
+`cattle | bunyan`
 
-# Send a ping command to all the remote cattle servers
-~/Source/cowboy$ cowboy ping
-Host                      Latency
-branden-macbook.local     13ms
+In a new terminal, run a command:
 
-Ping Statistics:
-Avg: 13.00ms
-Min: 13ms
-Max: 13ms
-Tmt: 0
+`cowboy ping`
 
-~/Source/cowboy$ cowboy describe
- 
-  Host                      | Module                    | Commands                                           
-----------------------------|---------------------------|----------------------------------------------------
-  branden-macbook.local     | cowboy@0.0.2              | describe, install, ping, uninstall                 
-----------------------------|---------------------------|----------------------------------------------------
-```
-
-## How it works
-
-Cowboy uses a client module called, well, the "cowboy" and each server in your cluster should run a "cattle" server. The cowboy broadcasts messages to the cattle using Redis PubSub and the cattle responds with another PubSub message back to the cowboy.
-
-### Walk-through
-
-Take for instance the simple `cowboy ping` command:
+Result:
 
 ```
-~/Source/cowboy$ cowboy ping
 Host                      Latency
 branden-macbook.local     13ms
 
@@ -58,7 +42,7 @@ Max: 13ms
 Tmt: 0
 ```
 
-When you execute `cowboy ping` from the cowboy, the cowboy client will issue a pubsub message on a command channel. All cattle nodes listening on the pubsub channel will receive the message, execute the `ping` command's `exec` method, who replies with a "pong" string. The plugin is in charge of receiving the request and performing the operations on the remote server and sending a response to the cowboy. It is also responsible for formatting that response on the cowboy client.
+It's just that easy.
 
 ## License
 
