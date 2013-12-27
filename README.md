@@ -1,15 +1,13 @@
 ## Cowboy
 
-[![Build Status](https://travis-ci.org/mrvisser/node-cowboy.png?branch=master)](https://travis-ci.org/mrvisser/node-cowboy) [![NPM version](https://badge.fury.io/js/cowboy.png)](http://badge.fury.io/js/cowboy) [![Dependency Status](https://gemnasium.com/mrvisser/node-cowboy.png)](https://gemnasium.com/mrvisser/node-cowboy)
+[![Build Status](https://travis-ci.org/mrvisser/node-cowboy.png?branch=master)](https://travis-ci.org/mrvisser/node-cowboy) [![NPM version](https://badge.fury.io/js/cowboy.png)](http://badge.fury.io/js/cowboy)
 
 **Cowboy** is a light-weight, easy-to-install tool that lassoes a large number of servers together in order to perform execution tasks or gather diagnostic information from nodes in parallel. At its core, Cowboy simply facilitates a framework and infrastructure that allows plugins to be implemented that do useful things. Out of the box, cowboy comes with a simple set of plugins:
 
-* `ping` - Interrogates the network for cattle nodes that are listening for commands
-* `install` - Installs a new cowboy module on all listening cattle nodes
-* `uninstall` - Uninstalls an installed cowboy module on all listening cattle nodes
 * `describe` - Describes the modules and commands available to all listening cattle nodes
-
-At this moment these core commands the only ones that exist, however more useful plugins will be in development and indexed here.
+* `install` - Installs a new cowboy module on all listening cattle nodes
+* `ping` - Interrogates the network for cattle nodes that are listening for commands
+* `uninstall` - Uninstalls an installed cowboy module on all listening cattle nodes
 
 ## Simple Usage
 

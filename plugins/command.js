@@ -1,8 +1,4 @@
 
-var _ = require('underscore');
-var colors = require('colors');
-var sprintf = require('sprintf-js').sprintf;
-
 var Command = module.exports = function() {};
 
 /**
