@@ -1,37 +1,37 @@
 <!DOCTYPE html>
 <html>
-
   <head>
-    <meta charset='utf-8' />
-    <meta http-equiv="X-UA-Compatible" content="chrome=1" />
-    <meta name="description" content="Cowboy : A pluggable parallel execution tool implemented with Node.js and Redis" />
-
-    <link rel="stylesheet" type="text/css" media="screen" href="stylesheets/stylesheet.css">
-
-    <title>Cowboy</title>
+    <meta charset='utf-8'>
+    <meta http-equiv="X-UA-Compatible" content="chrome=1">
+    <link href='https://fonts.googleapis.com/css?family=Chivo:900' rel='stylesheet' type='text/css'>
+    <link rel="stylesheet" type="text/css" href="stylesheets/stylesheet.css" media="screen" />
+    <link rel="stylesheet" type="text/css" href="stylesheets/pygment_trac.css" media="screen" />
+    <link rel="stylesheet" type="text/css" href="stylesheets/print.css" media="print" />
+    <!--[if lt IE 9]>
+    <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <title>Cowboy by mrvisser</title>
   </head>
 
   <body>
+    <div id="container">
+      <div class="inner">
 
-    <!-- HEADER -->
-    <div id="header_wrap" class="outer">
-        <header class="inner">
-          <a id="forkme_banner" href="https://github.com/mrvisser/node-cowboy">View on GitHub</a>
-
-          <h1 id="project_title">Cowboy</h1>
-          <h2 id="project_tagline">A pluggable parallel execution tool implemented with Node.js and Redis</h2>
-
-            <section id="downloads">
-              <a class="zip_download_link" href="https://github.com/mrvisser/node-cowboy/zipball/master">Download this project as a .zip file</a>
-              <a class="tar_download_link" href="https://github.com/mrvisser/node-cowboy/tarball/master">Download this project as a tar.gz file</a>
-            </section>
+        <header>
+          <h1>Cowboy</h1>
+          <h2>A pluggable parallel execution tool implemented with Node.js and Redis</h2>
         </header>
-    </div>
 
-    <!-- MAIN CONTENT -->
-    <div id="main_content_wrap" class="outer">
-      <section id="main_content" class="inner">
-        <p><strong>Cowboy</strong> is a light-weight, easy-to-install tool that lassoes a large number of servers together in order to perform execution tasks or gather diagnostic information from nodes in parallel. At its core, Cowboy simply facilitates a framework and infrastructure that allows plugins to be implemented that do useful things. We have a few helpful core plugins to get you started:</p>
+        <section id="downloads" class="clearfix">
+          <a href="https://github.com/mrvisser/node-cowboy/zipball/master" id="download-zip" class="button"><span>Download .zip</span></a>
+          <a href="https://github.com/mrvisser/node-cowboy/tarball/master" id="download-tar-gz" class="button"><span>Download .tar.gz</span></a>
+          <a href="https://github.com/mrvisser/node-cowboy" id="view-on-github" class="button"><span>View on GitHub</span></a>
+        </section>
+
+        <hr>
+
+        <section id="main_content">
+          <p><strong>Cowboy</strong> is a light-weight, easy-to-install tool that lassoes a large number of servers together in order to perform execution tasks or gather diagnostic information from nodes in parallel. At its core, Cowboy simply facilitates a framework and infrastructure that allows plugins to be implemented that do useful things. We give you these commands to get you started:</p>
 
 <ul>
 <li>
@@ -42,29 +42,41 @@
 <code>ping</code> - Interrogates the network for cattle nodes that are listening for commands</li>
 <li>
 <code>uninstall</code> - Uninstalls an installed cowboy module on all listening cattle nodes</li>
-</ul><p>And the rest is up to you!</p>
-
-<h2>
+</ul><h2>
 <a name="installation" class="anchor" href="#installation"><span class="octicon octicon-link"></span></a>Installation</h2>
 
 <p>First <a href="http://redis.io/download">download and install Redis</a>, make sure it's listening on port 6379.</p>
 
-<p>Then install the cowboy module:</p>
+<p>Install <a href="https://github.com/trentm/bunyan">Bunyan</a> and Cowboy:</p>
 
-<p><code>npm -g install cowboy</code></p>
-
-<p>Since Cowboy uses <a href="https://github.com/trentm/bunyan">Bunyan</a> for logging, it's best to install globally as well for piping log output:</p>
-
-<p><code>npm -g install bunyan</code></p>
+<p><code>npm install -g bunyan cowboy</code></p>
 
 <h2>
-<a name="usage" class="anchor" href="#usage"><span class="octicon octicon-link"></span></a>Usage</h2>
+<a name="simple-usage" class="anchor" href="#simple-usage"><span class="octicon octicon-link"></span></a>Simple Usage</h2>
 
-<p>Cowboy is made up of 2 components:</p>
+<p>Cowboy is made up of 2 components, the cattle server and the cowboy client. The Cattle server listens and executes commands when run from the cowboy client.</p>
 
-<p><strong>Cattle:</strong> The cattle binary listens to commands issued from the cowboy command VIA Redis. There must be a cattle process running on each server node that you control with Cowboy. This can be started by simply running: <code>cattle | bunyan</code>. For use in production, you will want to use something like <a href="https://github.com/nodejitsu/forever">Forever</a> or Upstart to run it as a daemon process.</p>
+<p>First start up the Cattle server:</p>
 
-<p><strong>Cowboy:</strong> The cowboy module is the command-line client where commands can be executed. To see options, type: <code>cowboy --help</code></p>
+<p><code>cattle | bunyan</code></p>
+
+<p>In a new terminal, run a command:</p>
+
+<p><code>cowboy ping</code></p>
+
+<p>Result:</p>
+
+<pre><code>Host                      Latency
+branden-macbook.local     13ms
+
+Ping Statistics:
+Avg: 13.00ms
+Min: 13ms
+Max: 13ms
+Tmt: 0
+</code></pre>
+
+<p>It's just that easy. Have a look at the <a href="https://github.com/mrvisser/node-cowboy/wiki">Wiki</a> for more advanced details.</p>
 
 <h2>
 <a name="license" class="anchor" href="#license"><span class="octicon octicon-link"></span></a>License</h2>
@@ -76,18 +88,15 @@
 <p>The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.</p>
 
 <p>THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.</p>
-      </section>
+        </section>
+
+        <footer>
+          Cowboy is maintained by <a href="https://github.com/mrvisser">mrvisser</a><br>
+          This page was generated by <a href="http://pages.github.com">GitHub Pages</a>. Tactile theme by <a href="https://twitter.com/jasonlong">Jason Long</a>.
+        </footer>
+
+        
+      </div>
     </div>
-
-    <!-- FOOTER  -->
-    <div id="footer_wrap" class="outer">
-      <footer class="inner">
-        <p class="copyright">Cowboy maintained by <a href="https://github.com/mrvisser">mrvisser</a></p>
-        <p>Published with <a href="http://pages.github.com">GitHub Pages</a></p>
-      </footer>
-    </div>
-
-    
-
   </body>
 </html>
