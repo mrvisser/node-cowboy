@@ -1,0 +1,13 @@
+{
+    "ignore": "^internal$",
+    "order": [
+        "context",
+        "logger",
+        "data",
+        "redis",
+        "conversations",
+        "presence",
+        "modules",
+        "plugins"
+    ]
+}

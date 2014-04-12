@@ -6,6 +6,7 @@ var optimist = require('optimist');
 var util = require('util');
 
 var CommandContext = require('../lib/internal/command-context');
+var InitContext = require('../lib/internal/init-context');
 
 var argv = optimist
     .usage('Usage: cattle [--config <config file>] [--log-level <level>] [--log-path <path>]')
@@ -26,8 +27,10 @@ process.on('uncaughtException', function(err) {
     cowboy.logger.system().error({'err': err}, 'An uncaught exception has been raised');
 });
 
+var intializationContext = new InitContext(argv);
+
 // Initialize the application context
-cowboy.context.init(argv, function(err) {
+cowboy.init(initializationContext, function(err) {
     if (err) {
         cowboy.logger.system().error({'err': err}, 'An error occurred initializing the context');
         process.exit(1);
